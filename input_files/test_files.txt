@@ -1,0 +1,7 @@
+/Users/macbookpro/Downloads/Run3/rootfiles/a9e6f73a-84b3-4636-9180-1281ed512ea3.root
+/Users/macbookpro/Downloads/Run3/rootfiles/090b75df-297c-43a4-8178-5cbfd06387bc.root
+/Users/macbookpro/Downloads/Run3/rootfiles/062891f1-74ed-4c50-b7ec-debe7738222c.root
+/Users/macbookpro/Downloads/Run3/rootfiles/28dd5df6-f938-4b16-aa31-0fc08e85fd9a.root
+/Users/macbookpro/Downloads/Run3/rootfiles/7370e133-8932-44d4-af22-8d8868237e39.root
+/Users/macbookpro/Downloads/Run3/rootfiles/31594817-e648-4f8f-a8e1-364b33fe654f.root
+/Users/macbookpro/Downloads/Run3/rootfiles/d8f312d3-c1ca-46f4-a841-332368c52e68.root

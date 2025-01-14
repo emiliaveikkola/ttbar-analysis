@@ -1,33 +1,12 @@
 # Build output files
 *.o
-
-# Temporary files
 *.tmp
 *.log
-
-# OS-specific files
 .DS_Store
-
-# IDE settings
 .vscode/
-
-# Ignore all files ending with .d (if these are files; if they are directories, see below)
 *.d
-
-# Ignore all .pcm files
 *.pcm
-
-# Ignore all .so files
 *.so
+rootfiles/
+ignore/
 
-# Ignore all .root files
-*.root
-
-# If you have other specific files you don't want to share, list them explicitly:
-mk.C
-Branches.h
-Loop.C
-mk_compile.C
-Cert_Collisions2024_378981_386951_Golden_corrected.json
-json_converter.py
-__pycache__/

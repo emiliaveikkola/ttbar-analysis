@@ -16,6 +16,7 @@
 #include "CondFormats/JetMETObjects/interface/FactorizedJetCorrector.h"
 #include "CondFormats/JetMETObjects/interface/JetCorrectorParameters.h"
 #include "CondFormats/JetMETObjects/interface/JetCorrectionUncertainty.h"
+#include "CondFormats/JetMETObjects/interface/FactorizedJetCorrectorWrapper.h"
 
 #include <iostream>
 #include <cstdio>
@@ -241,6 +242,8 @@ public :
    Int_t           nJet;
    UChar_t         Jet_chMultiplicity[200];   //[nJet]
    UChar_t         Jet_jetId[200];   //[nJet]
+   UChar_t         Jet_hadronFlavour[200];
+   Short_t         Jet_partonFlavour[200];   //[nJet] 
    UChar_t         Jet_nConstituents[200];   //[nJet]
    UChar_t         Jet_nElectrons[200];   //[nJet]
    UChar_t         Jet_nMuons[200];   //[nJet]
@@ -2065,6 +2068,8 @@ public :
    TBranch        *b_nJet;   //!
    TBranch        *b_Jet_chMultiplicity;   //!
    TBranch        *b_Jet_jetId;   //!
+   TBranch        *b_Jet_partonFlavour;   //!
+   TBranch        *b_Jet_hadronFlavour;   //!
    TBranch        *b_Jet_nConstituents;   //!
    TBranch        *b_Jet_nElectrons;   //!
    TBranch        *b_Jet_nMuons;   //!
@@ -3771,6 +3776,17 @@ void WMassRun3::Init(TTree *tree)
    fChain = tree;
    fCurrent = -1;
    fChain->SetMakeClass(1);
+
+   if (fChain->GetBranch("Jet_hadronFlavour")) {
+      fChain->SetBranchAddress("Jet_hadronFlavour",
+                           Jet_hadronFlavour,
+                           &b_Jet_hadronFlavour);
+   }
+   if (fChain->GetBranch("Jet_partonFlavour")) {
+      fChain->SetBranchAddress("Jet_partonFlavour",
+                              Jet_partonFlavour,
+                              &b_Jet_partonFlavour);
+   }
 
    fChain->SetBranchAddress("run", &run, &b_run);
    fChain->SetBranchAddress("luminosityBlock", &luminosityBlock, &b_luminosityBlock);

@@ -203,12 +203,18 @@ void WMassRun3::Loop()
    static const std::string runEra = "D"; // for 2025: "A", "B", etc.
    std::string jsonFile, jecMCSet, jecDataSet, outputFile, jetVetoMap;
    bool isMC = false;
-   if (runYear == 2024) {
+   if (isMC) {
+       jsonFile   = "Cert_Collisions2024_378981_386951_Golden.json";
+       jecMCSet   = "RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI"; //Winter24Run3_V1_MC_L2Relative_AK4PUPPI //RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI
+       jetVetoMap = "jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root"; //jet_veto_maps/Winter24Prompt24/Winter24Prompt24_2024BCDEFGHI.root //jetvetoReReco2024_V9M.root
+       outputFile = "Summer24_TTtoLNu2Q.root";
+   }
+   else if (runYear == 2024) {
        jsonFile   = "Cert_Collisions2024_378981_386951_Golden.json";
        jecMCSet   = "RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI"; //Winter24Run3_V1_MC_L2Relative_AK4PUPPI //RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI
        jecDataSet = "ReReco24_V9M_DATA"; //Reprocessing24_V8M_DATA //Prompt24_V8M_DATA //ReReco24_V9M_DATA
        jetVetoMap = "jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root"; //jet_veto_maps/Winter24Prompt24/Winter24Prompt24_2024BCDEFGHI.root //jetvetoReReco2024_V9M.root
-       outputFile = "Summer24_TTtoLNu2Q.root";
+       outputFile = "Muon_Run2024____.root";
    } else if (runYear == 2025) {
        if (runEra == "C") {
            jsonFile   = "Cert_Collisions2025_391658_393461_Golden.json";
@@ -217,7 +223,7 @@ void WMassRun3::Loop()
            jetVetoMap = "jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               
            outputFile = "Muon_Run2025C_Prompt.root";
        } else if (runEra == "D") {
-           jsonFile   = "Cert_Collisions2025D_391668_395032_Merged.json"; //"Collisions25_13p6TeV_391658_395372_DCSOnly_TkPx.json";
+           jsonFile   = "Cert_Collisions2025D_daily_dials_12-08-2025.json"; //"Collisions25_13p6TeV_391658_395372_DCSOnly_TkPx.json";
            jecMCSet   = "Winter25Run3_V1_MC_L2Relative_AK4PUPPI";
            jecDataSet = "Prompt25_V1M_DATA";
            jetVetoMap = "jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               

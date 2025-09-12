@@ -200,7 +200,7 @@ void WMassRun3::Loop()
    //fout = new TFile("Summer24_TTtoLNu2Q.root", "RECREATE");
    // Year-based configuration
    static const int runYear = 2025; // set to 2024 or 2025
-   static const std::string runEra = "D"; // for 2025: "A", "B", etc.
+   static const std::string runEra = "E"; // for 2025: "A", "B", etc.
    std::string jsonFile, jecMCSet, jecDataSet, outputFile, jetVetoMap;
    bool isMC = false;
    if (isMC) {
@@ -223,11 +223,17 @@ void WMassRun3::Loop()
            jetVetoMap = "jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               
            outputFile = "Muon_Run2025C_Prompt.root";
        } else if (runEra == "D") {
-           jsonFile   = "Cert_Collisions2025_391658_395982_golden"; //"Cert_Collisions2025D_daily_dials_12-08-2025.json"; //"Collisions25_13p6TeV_391658_395372_DCSOnly_TkPx.json";
+           jsonFile   = "Cert_Collisions2025_391658_395982_golden.json"; //"Cert_Collisions2025D_daily_dials_12-08-2025.json"; //"Collisions25_13p6TeV_391658_395372_DCSOnly_TkPx.json";
            jecMCSet   = "Winter25Run3_V1_MC_L2Relative_AK4PUPPI";
            jecDataSet = "Prompt25_V1M_DATA";
            jetVetoMap = "jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               
            outputFile = "Muon_Run2025D_Prompt.root";
+       } else if (runEra == "E") {
+           jsonFile   = "daily_dials.json"; //"Cert_Collisions2025D_daily_dials_12-08-2025.json"; //"Collisions25_13p6TeV_391658_395372_DCSOnly_TkPx.json";
+           jecMCSet   = "Winter25Run3_V1_MC_L2Relative_AK4PUPPI";
+           jecDataSet = "Prompt25_V1M_DATA";
+           jetVetoMap = "jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               
+           outputFile = "Muon_Run2025E_Prompt.root";
        } else {
            std::cerr << "Unsupported runEra: " << runEra << std::endl;
            return;

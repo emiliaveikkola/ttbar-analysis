@@ -2,19 +2,26 @@
 import json
 import shutil
 from pathlib import Path
+from datetime import date
 
-# Edit this path if the file lives elsewhere
-p = Path("Cert_Collisions2025_391658_395982_golden.json")
-backup = p.with_suffix(".json.bak")
-if not backup.exists():
-    shutil.copy(p, backup)  # keep original
+# Source file (unchanging name)
+p_in = Path("daily_dials.json")
 
-# Load expanded JSON
-with open(p, "r") as f:
+# One-time backup of the original source
+backup = p_in.with_suffix(".json.bak")
+if p_in.exists() and not backup.exists():
+    shutil.copy(p_in, backup)
+
+# Load expanded JSON from source
+with open(p_in, "r") as f:
     data = json.load(f)
 
-# Rewrite in compact [[a,b],...] style
-with open(p, "w") as f:
+# Output file with today's date in the name
+today = date.today().isoformat()  # YYYY-MM-DD
+p_out = Path(f"daily_dials_{today}.json")
+
+# Rewrite in compact [[a,b],...] style to dated file
+with open(p_out, "w") as f:
     f.write("{\n")
     keys = list(data.keys())
     for idx, k in enumerate(keys):

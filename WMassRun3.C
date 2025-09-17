@@ -66,9 +66,9 @@ FactorizedJetCorrector *getFJC(string l1="", string l2="", string res="",
     JetCorrectorParameters *pres = new JetCorrectorParameters(s);
     v.push_back(*pres);
   }
-  FactorizedJetCorrector *jec = new FactorizedJetCorrector(v);
+  FactorizedJetCorrector *jec2024 = new FactorizedJetCorrector(v);
 
-  return jec;
+  return jec2024;
 } // getJFC 
 
 
@@ -200,7 +200,7 @@ void WMassRun3::Loop()
    //fout = new TFile("Summer24_TTtoLNu2Q.root", "RECREATE");
    // Year-based configuration
    static const int runYear = 2025; // set to 2024 or 2025
-   static const std::string runEra = "E"; // for 2025: "A", "B", etc.
+   static const std::string runEra = "C"; // for 2025: "A", "B", etc.
    std::string jsonFile, jecMCSet, jecDataSet, outputFile, jetVetoMap;
    bool isMC = false;
    if (isMC) {
@@ -219,21 +219,21 @@ void WMassRun3::Loop()
        if (runEra == "C") {
            jsonFile   = "Cert_Collisions2025_391658_393461_Golden.json";
            jecMCSet   = "Winter25Run3_V1_MC_L2Relative_AK4PUPPI";
-           jecDataSet = "Prompt25_V1M_DATA";
-           jetVetoMap = "jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               
-           outputFile = "Muon_Run2025C_Prompt.root";
+           jecDataSet = "Prompt25_V2M_DATA/Prompt25_Run2025C_V2M_DATA_L2L3Residual_AK4PFPuppi"; //"Prompt25_V1M_DATA";
+           jetVetoMap = "jet_veto_maps/jetveto2025CDE_V2M.root"; //"jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               
+           outputFile = "Muon_Run2025C_Prompt_V2M.root";
        } else if (runEra == "D") {
            jsonFile   = "Cert_Collisions2025_391658_395982_golden.json"; //"Cert_Collisions2025D_daily_dials_12-08-2025.json"; //"Collisions25_13p6TeV_391658_395372_DCSOnly_TkPx.json";
            jecMCSet   = "Winter25Run3_V1_MC_L2Relative_AK4PUPPI";
-           jecDataSet = "Prompt25_V1M_DATA";
-           jetVetoMap = "jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               
-           outputFile = "Muon_Run2025D_Prompt.root";
+           jecDataSet = "Prompt25_V2M_DATA/Prompt25_Run2025D_V2M_DATA_L2L3Residual_AK4PFPuppi"; //"Prompt25_V1M_DATA";
+           jetVetoMap = "jet_veto_maps/jetveto2025CDE_V2M.root"; //"jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               
+           outputFile = "Muon_Run2025D_Prompt_V2M.root";
        } else if (runEra == "E") {
-           jsonFile   = "daily_dials.json"; //"Cert_Collisions2025D_daily_dials_12-08-2025.json"; //"Collisions25_13p6TeV_391658_395372_DCSOnly_TkPx.json";
+           jsonFile   = "daily_dials_2025-09-17.json"; //"Cert_Collisions2025D_daily_dials_12-08-2025.json"; //"Collisions25_13p6TeV_391658_395372_DCSOnly_TkPx.json";
            jecMCSet   = "Winter25Run3_V1_MC_L2Relative_AK4PUPPI";
-           jecDataSet = "Prompt25_V1M_DATA";
-           jetVetoMap = "jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               
-           outputFile = "Muon_Run2025E_Prompt.root";
+           jecDataSet = "Prompt25_V2M_DATA/Prompt25_Run2025E_V2M_DATA_L2L3Residual_AK4PFPuppi"; //"Prompt25_V1M_DATA";
+           jetVetoMap = "jet_veto_maps/jetveto2025CDE_V2M.root"; //"jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               
+           outputFile = "Muon_Run2025E_Prompt_V2M.root";
        } else {
            std::cerr << "Unsupported runEra: " << runEra << std::endl;
            return;
@@ -247,11 +247,12 @@ void WMassRun3::Loop()
    if (isMC) {
       fChain->SetBranchStatus("Jet_hadronFlavour", 1);
       fChain->SetBranchStatus("Jet_partonFlavour", 1);
+      fChain->SetBranchStatus("genWeight", 1);
    }
 
    TH1::SetDefaultSumw2();
 
-   double xmax = 389000.5; //386000.5
+   double xmax = 400000.5; //389000.5
    double xmin = 355000.5;
    double histnx = xmax-xmin;
 
@@ -270,6 +271,9 @@ void WMassRun3::Loop()
    TProfile *prof_L2L3 = new TProfile("prof_L2L3", ";Run;L2L3 factor;", histnx, xmin, xmax);
    TProfile *prof_L1 = new TProfile("prof_L1", ";Run;L1 factor;", histnx, xmin, xmax);
    TProfile *prof_corr = new TProfile("prof_corr", ";Run;corr;", histnx, xmin, xmax);
+
+   TProfile* pres = new TProfile("pres", ";pt_pair;1/(L2L3Res);", nx, vx);
+   TProfile* pjes = new TProfile("pjes", ";pt_pair;1/(L2);",       nx, vx);
 
    TProfile *prof_L2L3Res_ptpair = new TProfile("prof_L2L3Res_ptpair", ";pt_pair;L2L3Res factor;", nx, vx);
    TProfile *prof_L2L3_ptpair = new TProfile("prof_L2L3_ptpair", ";pt_pair;L2L3 factor;", nx, vx);
@@ -437,13 +441,13 @@ void WMassRun3::Loop()
    //jec = getFJC("", "Winter24Run3_V1_MC_L2Relative_AK4PUPPI", "Prompt24_Run2024G_V7M_DATA_L2L3Residual_AK4PFPuppi");
 
    // Pointers for JEC
-   FactorizedJetCorrectorWrapper *jec(0);
-   FactorizedJetCorrector *jec_MC(0);
+   FactorizedJetCorrectorWrapper *jec2024(0);
+   FactorizedJetCorrector *jec(0);
 
    // Initialize JEC according to mode
    //if (isMC) {
-   //   jec_MC = getFJC("", "RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI", ""); //Winter24Run3_V1_MC_L2Relative_AK4PUPPI //RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI
-   //   assert(jec_MC);
+   //   jec = getFJC("", "RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI", ""); //Winter24Run3_V1_MC_L2Relative_AK4PUPPI //RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI
+   //   assert(jec);
    //} else {
    //   // Data: instantiate and assign directly to outer jec pointer
    //   jec = new FactorizedJetCorrectorWrapper();
@@ -452,15 +456,25 @@ void WMassRun3::Loop()
    //}
    // Dynamic JEC initialization
    if (isMC) {
-       jec_MC = getFJC("", jecMCSet, "");
-       assert(jec_MC);
-   } else if (runYear == 2025){
-       jec_MC = getFJC("", jecMCSet, "Prompt25_V1M_DATA/Prompt25_Run2025C_V1M_DATA_L2L3Residual_AK4PFPuppi");
-       assert(jec_MC);
-   } else {
-       jec = new FactorizedJetCorrectorWrapper();
-       jec->addJECset(jecDataSet);
+       jec = getFJC("", jecMCSet, "");
        assert(jec);
+   } else if (runYear == 2025){
+         if (runEra == "C"){
+            jec = getFJC("", jecMCSet, jecDataSet);
+            assert(jec);
+         }
+         else if (runEra == "D"){
+            jec = getFJC("", jecMCSet, jecDataSet);
+            assert(jec);
+         }
+         else if (runEra == "E"){
+            jec = getFJC("", jecMCSet, jecDataSet);
+            assert(jec);
+         }
+   } else { //2024 with fibs.txt
+       jec2024 = new FactorizedJetCorrectorWrapper();
+       jec2024->addJECset(jecDataSet);
+       assert(jec2024);
    }
 
    //FactorizedJetCorrectorWrapper *jec = new FactorizedJetCorrectorWrapper();
@@ -546,24 +560,24 @@ void WMassRun3::Loop()
          for (int i = 0; i != nJet; ++i) {
 
             // Redo JEC on the fly (should be no previous use of corrected jets)
-            if (jec!=0 || jec_MC!=0) {
+            if (jec2024!=0 || jec!=0) {
 
                double rawJetPt = Jet_pt[i] * (1.0 - Jet_rawFactor[i]);
                double rawJetMass = Jet_mass[i] * (1.0 - Jet_rawFactor[i]);
                if (isMC || (runYear == 2025)) {
-                  jec_MC->setJetPt(rawJetPt);
-                  jec_MC->setJetEta(Jet_eta[i]);
-                  jec_MC->setJetPhi(Jet_phi[i]);
-               } else {
-                  jec->setRun(run);
                   jec->setJetPt(rawJetPt);
                   jec->setJetEta(Jet_eta[i]);
                   jec->setJetPhi(Jet_phi[i]);
+               } else {
+                  jec2024->setRun(run);
+                  jec2024->setJetPt(rawJetPt);
+                  jec2024->setJetEta(Jet_eta[i]);
+                  jec2024->setJetPhi(Jet_phi[i]);
                }
                //double corr = jec->getCorrection();
                vector<float> v;
-               if (isMC || (runYear == 2025)) {v = jec_MC->getSubCorrections();
-               } else {v = jec->getSubCorrections();}
+               if (isMC || (runYear == 2025)) {v = jec->getSubCorrections();
+               } else {v = jec2024->getSubCorrections();}
                double corr = v.back();
                double res = (v.size()>1 ? v[v.size()-1]/v[v.size()-2] : 1.);
 
@@ -585,6 +599,20 @@ void WMassRun3::Loop()
                Jet_mass[i] = corr * rawJetMass;
                Jet_rawFactor[i] = (1.0 - 1.0/corr);
                Jet_resFactor[i] = (1.0 - 1.0/res);
+            }
+
+            jeti.SetPtEtaPhiM(Jet_pt[i], Jet_eta[i], Jet_phi[i], Jet_mass[i]);
+
+            if (iJet==-1) { // Leading jet for balance
+               iJet = i;
+               jet = jeti;
+            }
+            else { // Subleading jets 
+               jetn += jeti;
+               if (iJet2==-1) { // First subleading jet for alpha
+                  iJet2 = i;
+                  jet2 = jeti;
+               }
             }
          } // for i in nJet 
       
@@ -620,6 +648,7 @@ void WMassRun3::Loop()
 
          bool pass_basic = (pass_trig && pass_filt && pass_jetveto);
 
+         double w = 1; //(isMC ? genWeight : 1);    //in case of MC set w to genWeight, otherwise (data) leave it 1
 
          // ========== Independent check: At least 3 jets, 1 b-tag ==========
          int nSelectedJets = 0;
@@ -840,7 +869,7 @@ void WMassRun3::Loop()
                double W_mass = W_p4.M();  // invariant mass in GeV
                double W_pt = W_p4.Pt();   // invariant pt in GeV
                // Fill W eta distribution
-               h_Weta->Fill(W_p4.Eta());
+               h_Weta->Fill(W_p4.Eta(), w);
                double singleJetW_mass = singleJetW_p4.M();
 
                W_improved_p4 = W_p4 * (80.4/W_p4.M());
@@ -885,18 +914,18 @@ void WMassRun3::Loop()
 
                double mbl_red = mbl/Top_mass;
 
-               prof_top->Fill(run, Top_mass); 
-               prof_top_improved->Fill(run, Top_mass_improved); 
-               prof_W->Fill(run, W_mass);
+               prof_top->Fill(run, Top_mass, w); 
+               prof_top_improved->Fill(run, Top_mass_improved, w); 
+               prof_W->Fill(run, W_mass, w);
 
                int flav1 = Jet_partonFlavour[leadLightJet];
                int flav2 = Jet_partonFlavour[secondLightJet];
 
                // Fill the histogram
-               h_Wmass->Fill(W_mass);
-               h_Wmass_pt->Fill(W_pt, W_mass);
-               h_singleJetWmass->Fill(singleJetW_mass);
-               h_Wpt->Fill(W_pt);
+               h_Wmass->Fill(W_mass, w);
+               h_Wmass_pt->Fill(W_pt, W_mass, w);
+               h_singleJetWmass->Fill(singleJetW_mass, w);
+               h_Wpt->Fill(W_pt, w);
 
                if ((isMC || (runYear == 2025)) && secondLightJet >= 0) {
                   int raw1 = Jet_partonFlavour[leadLightJet];
@@ -917,31 +946,31 @@ void WMassRun3::Loop()
                   ) {
                      int f1 = min(raw1, 6);
                      int f2 = min(raw2, 6);
-                     h2_Wjets->Fill(f1, f2);
+                     h2_Wjets->Fill(f1, f2, w);
                   }
                }
-               h_Jet1Pt->Fill(lj1_p4.Pt());
+               h_Jet1Pt->Fill(lj1_p4.Pt(), w);
                if (!heavyFallback && secondLightJet >= 0) {
-                   h_Jet1Pt->Fill(lj2_p4.Pt());
+                   h_Jet2Pt->Fill(lj2_p4.Pt(), w);
                }
 
                // histograms: top1 = b1 + lj1 + lj2, top2 = b2 + lj1+ lj2
-               h_Top2mass->Fill(Top2_mass);
-               h_Top1mass->Fill(Top1_mass);
-               h_Topmass->Fill(Top_mass);
-               h_Topmass_improved->Fill(Top_mass_improved);
+               h_Top2mass->Fill(Top2_mass, w);
+               h_Top1mass->Fill(Top1_mass, w);
+               h_Topmass->Fill(Top_mass, w);
+               h_Topmass_improved->Fill(Top_mass_improved, w);
                 // massb&lep = mbl
-               h_mbl1->Fill(mbl1);
-               h_mbl2->Fill(mbl2);
-               h_mbl->Fill(mbl);
-               h_mbl_red->Fill(mbl_red);
+               h_mbl1->Fill(mbl1, w);
+               h_mbl2->Fill(mbl2, w);
+               h_mbl->Fill(mbl, w);
+               h_mbl_red->Fill(mbl_red, w);
 
                double rbq = (b1_p4.Pt()+b2_p4.Pt())/(lj1_p4.Pt()+lj2_p4.Pt());
                double rbl = (b1_p4.Pt()+b2_p4.Pt())/(2*muon_p4.Pt());
                // pt: b1+b2/(lj1+lj2) = rbq
-               if (secondLightJet >= 0) {h_rbq->Fill(rbq);}
+               if (secondLightJet >= 0) {h_rbq->Fill(rbq, w);}
                // rbl: b1+b2/(2*l1)
-               h_rbl->Fill(rbl);
+               h_rbl->Fill(rbl, w);
 
                double pt_pair = TMath::Sqrt( lj1_p4.Pt() * lj2_p4.Pt());
                double pt_pair_improved = (80.4/W_p4.M()) * pt_pair;
@@ -950,26 +979,26 @@ void WMassRun3::Loop()
                   if (!heavyFallback) {
                      double rawJetPt1 = Jet_pt[leadLightJet] * (1.0 - Jet_rawFactor[leadLightJet]);
                      if (isMC || (runYear == 2025)){
-                        jec_MC->setJetPt(rawJetPt1);
-                        jec_MC->setJetEta(Jet_eta[leadLightJet]);
-                        jec_MC->setJetPhi(Jet_phi[leadLightJet]);
-                     } else {
-                        jec->setRun(run);
                         jec->setJetPt(rawJetPt1);
                         jec->setJetEta(Jet_eta[leadLightJet]);
                         jec->setJetPhi(Jet_phi[leadLightJet]);
+                     } else {
+                        jec2024->setRun(run);
+                        jec2024->setJetPt(rawJetPt1);
+                        jec2024->setJetEta(Jet_eta[leadLightJet]);
+                        jec2024->setJetPhi(Jet_phi[leadLightJet]);
                      }
 
                      vector<float> v1;
-                     if (isMC || (runYear == 2025)) {v1 = jec_MC->getSubCorrections();
-                     } else {v1 = jec->getSubCorrections();}
+                     if (isMC || (runYear == 2025)) {v1 = jec->getSubCorrections();
+                     } else {v1 = jec2024->getSubCorrections();}
 
                      if (fabs(lj1_p4.Eta()) < 1.3 && fabs(lj2_p4.Eta())  < 1.3) { //&& pt_pair > 53. && pt_pair < 107.){
-                        h2_Wmass_ptpair->Fill(pt_pair, W_mass);
-                        h2_Wmass_ptpair_improved->Fill(pt_pair_improved, W_mass);
+                        h2_Wmass_ptpair->Fill(pt_pair, W_mass, w);
+                        h2_Wmass_ptpair_improved->Fill(pt_pair_improved, W_mass, w);
 
-                        prof_W_ptpair->Fill(pt_pair, W_mass);
-                        prof_W_ptpair_improved->Fill(pt_pair_improved, W_mass);
+                        prof_W_ptpair->Fill(pt_pair, W_mass, w);
+                        prof_W_ptpair_improved->Fill(pt_pair_improved, W_mass, w);
 
                         struct Range { double xlo,xhi,ylo,yhi; };
                         static const Range sigBins[] = {
@@ -1032,67 +1061,67 @@ void WMassRun3::Loop()
 
                         if (isSignal || isBackground){
                            if (isSignal) {
-                           h2_W_ptpair_sig->Fill(pt_pair, W_mass);
+                           h2_W_ptpair_sig->Fill(pt_pair, W_mass, w);
                            } 
                            if (isBackground) {
-                              h2_W_ptpair_bkg->Fill(pt_pair, W_mass);
+                              h2_W_ptpair_bkg->Fill(pt_pair, W_mass, w);
                            }
                         } else {
-                           h2_W_ptpair_cr->Fill(pt_pair, W_mass);
+                           h2_W_ptpair_cr->Fill(pt_pair, W_mass, w);
                         }
                         
-                        h_ptpair->Fill(pt_pair);
-                        h_ptpair_improved->Fill(pt_pair_improved);
+                        h_ptpair->Fill(pt_pair, w);
+                        h_ptpair_improved->Fill(pt_pair_improved, w);
                         if (isMC || (runYear == 2025)){
                            bool isG1 = (flav1 == 21), isG2 = (flav2 == 21);
                            if      (isG1 && isG2) {
-                              h2_Wmass_ptpair_gg->Fill(pt_pair, W_mass);
-                              prof_W_ptpair_gg->Fill(pt_pair, W_mass);
-                              h_ptpair_gg->Fill(pt_pair);
-                              h2_Wmass_ptpair_improved_gg->Fill(pt_pair_improved, W_mass);
-                              prof_W_ptpair_improved_gg->Fill(pt_pair_improved, W_mass);
-                              h_ptpair_improved_gg->Fill(pt_pair_improved);
+                              h2_Wmass_ptpair_gg->Fill(pt_pair, W_mass, w);
+                              prof_W_ptpair_gg->Fill(pt_pair, W_mass, w);
+                              h_ptpair_gg->Fill(pt_pair, w);
+                              h2_Wmass_ptpair_improved_gg->Fill(pt_pair_improved, W_mass, w);
+                              prof_W_ptpair_improved_gg->Fill(pt_pair_improved, W_mass, w);
+                              h_ptpair_improved_gg->Fill(pt_pair_improved, w);
                            }
                            else if (isG1 != isG2) {
-                              h2_Wmass_ptpair_qg->Fill(pt_pair, W_mass);
-                              prof_W_ptpair_qg->Fill(pt_pair, W_mass);
-                              h_ptpair_qg->Fill(pt_pair);
-                              h2_Wmass_ptpair_improved_qg->Fill(pt_pair_improved, W_mass);
-                              prof_W_ptpair_improved_qg->Fill(pt_pair_improved, W_mass);
-                              h_ptpair_improved_qg->Fill(pt_pair_improved);
+                              h2_Wmass_ptpair_qg->Fill(pt_pair, W_mass, w);
+                              prof_W_ptpair_qg->Fill(pt_pair, W_mass, w);
+                              h_ptpair_qg->Fill(pt_pair, w);
+                              h2_Wmass_ptpair_improved_qg->Fill(pt_pair_improved, W_mass, w);
+                              prof_W_ptpair_improved_qg->Fill(pt_pair_improved, W_mass, w);
+                              h_ptpair_improved_qg->Fill(pt_pair_improved, w);
                            }
                            else if (qqPairs(flav1, flav2)) {
-                              h2_Wmass_ptpair_qq->Fill(pt_pair, W_mass);
-                              prof_W_ptpair_qq->Fill(pt_pair, W_mass);
-                              h_ptpair_qq->Fill(pt_pair);
-                              h2_Wmass_ptpair_improved_qq->Fill(pt_pair_improved, W_mass);
-                              prof_W_ptpair_improved_qq->Fill(pt_pair_improved, W_mass);
-                              h_ptpair_improved_qq->Fill(pt_pair_improved);
+                              h2_Wmass_ptpair_qq->Fill(pt_pair, W_mass, w);
+                              prof_W_ptpair_qq->Fill(pt_pair, W_mass, w);
+                              h_ptpair_qq->Fill(pt_pair, w);
+                              h2_Wmass_ptpair_improved_qq->Fill(pt_pair_improved, W_mass, w);
+                              prof_W_ptpair_improved_qq->Fill(pt_pair_improved, W_mass, w);
+                              h_ptpair_improved_qq->Fill(pt_pair_improved, w);
                            }
                            else {
-                              h2_Wmass_ptpair_qq_others->Fill(pt_pair, W_mass);
-                              prof_W_ptpair_qq_others->Fill(pt_pair, W_mass);
-                              h_ptpair_qq_others->Fill(pt_pair);
-                              h2_Wmass_ptpair_improved_qq_others->Fill(pt_pair_improved, W_mass);
-                              prof_W_ptpair_improved_qq_others->Fill(pt_pair_improved, W_mass);
-                              h_ptpair_improved_qq_others->Fill(pt_pair_improved);
+                              h2_Wmass_ptpair_qq_others->Fill(pt_pair, W_mass, w);
+                              prof_W_ptpair_qq_others->Fill(pt_pair, W_mass, w);
+                              h_ptpair_qq_others->Fill(pt_pair, w);
+                              h2_Wmass_ptpair_improved_qq_others->Fill(pt_pair_improved, W_mass, w);
+                              prof_W_ptpair_improved_qq_others->Fill(pt_pair_improved, W_mass, w);
+                              h_ptpair_improved_qq_others->Fill(pt_pair_improved, w);
                            }
                         }
                         // Geometric average of the two light‑jet factors (to match pt_pair definition)
                         double rawJetPt2 = Jet_pt[secondLightJet] * (1.0 - Jet_rawFactor[secondLightJet]);
                         if (isMC || (runYear == 2025)){
-                           jec_MC->setJetPt(rawJetPt2);
-                           jec_MC->setJetEta(Jet_eta[secondLightJet]);
-                           jec_MC->setJetPhi(Jet_phi[secondLightJet]);
-                        } else {
-                           jec->setRun(run);
                            jec->setJetPt(rawJetPt2);
                            jec->setJetEta(Jet_eta[secondLightJet]);
                            jec->setJetPhi(Jet_phi[secondLightJet]);
+                        } else {
+                           jec2024->setRun(run);
+                           jec2024->setJetPt(rawJetPt2);
+                           jec2024->setJetEta(Jet_eta[secondLightJet]);
+                           jec2024->setJetPhi(Jet_phi[secondLightJet]);
                         }
                         vector<float> v2;
-                        if (isMC || (runYear == 2025)) {v2 = jec_MC->getSubCorrections();
-                        } else {v2 = jec->getSubCorrections();}
+                        if (isMC || (runYear == 2025)) {v2 = jec->getSubCorrections();
+                        } else {v2 = jec2024->getSubCorrections();}
 
                         /* ---- derive geometric-mean sub-factors ------------------------- */
                         double L1_1 = 1.0, L2_1 = 1.0, Res_1 = 1.0;
@@ -1110,66 +1139,68 @@ void WMassRun3::Loop()
                         double Res_g     = TMath::Sqrt(Res_1 * Res_2);        // residual
                         double corrAvg_g = TMath::Sqrt(v1.back() * v2.back()); // full factor
                         /* ---------------------------------------------------------------- */
-                        prof_L2L3Res_ptpair->Fill(pt_pair, Res_g);
-                        prof_L2L3_ptpair->Fill(pt_pair, L2_g);
-                        prof_L1_ptpair->Fill(pt_pair, L1_g);
-                        prof_corr_ptpair->Fill(pt_pair, corrAvg_g);
+                        prof_L2L3Res_ptpair->Fill(pt_pair, Res_g, w);
+                        prof_L2L3_ptpair->Fill(pt_pair, L2_g, w);
+                        prof_L1_ptpair->Fill(pt_pair, L1_g, w);
+                        prof_corr_ptpair->Fill(pt_pair, corrAvg_g, w);
+                        if (Res_g > 0.0) pres->Fill(pt_pair, 1.0/Res_g, w);
+                        if (L2_g  > 0.0) pjes->Fill(pt_pair, 1.0/L2_g, w);
                      }
                      //double top_mass = (fabs(Top1_mass-172.5)< fabs(Top2_mass-172.5) ? Top1_mass : Top2_mass);
                   }
                }
                //if (fabs(W_mass-80.4) < 20. && fabs(top_mass-172.5) < 40.){
                if ((W_mass > 40. && W_mass < 140.) && (Top_mass > 120. && Top_mass < 230.)){
-                  h_Wmass_inWindow->Fill(W_mass);
-                  prof_top_inWindow->Fill(run, Top_mass); 
-                  prof_W_inWindow->Fill(run, W_mass);
-                  h_Topmass_inWindow->Fill(Top_mass);
-                  h_mbl_inWindow->Fill(mbl);
-                  h_mbl_red_inWindow->Fill(mbl_red);
-                  h_rbl_inWindow->Fill(rbl);
-                  if (secondLightJet >= 0) {h_rbq_inWindow->Fill(rbq);}
+                  h_Wmass_inWindow->Fill(W_mass, w);
+                  prof_top_inWindow->Fill(run, Top_mass, w); 
+                  prof_W_inWindow->Fill(run, W_mass, w);
+                  h_Topmass_inWindow->Fill(Top_mass, w);
+                  h_mbl_inWindow->Fill(mbl, w);
+                  h_mbl_red_inWindow->Fill(mbl_red, w);
+                  h_rbl_inWindow->Fill(rbl, w);
+                  if (secondLightJet >= 0) {h_rbq_inWindow->Fill(rbq, w);}
                   
                   if (!heavyFallback && secondLightJet >= 0) {
                      if (fabs(lj1_p4.Eta()) < 1.3 && fabs(lj2_p4.Eta())  < 1.3) { //&& pt_pair > 53. && pt_pair < 107.){
-                        h2_Wmass_inWindow_ptpair->Fill(pt_pair, W_mass);
-                        prof_W_inWindow_ptpair->Fill(pt_pair, W_mass);
-                        h2_Wmass_inWindow_ptpair_improved->Fill(pt_pair_improved, W_mass);
-                        prof_W_inWindow_ptpair_improved->Fill(pt_pair_improved, W_mass);
-                        h_ptpair_inWindow->Fill(pt_pair);
-                        h_ptpair_inWindow_improved->Fill(pt_pair_improved);
+                        h2_Wmass_inWindow_ptpair->Fill(pt_pair, W_mass, w);
+                        prof_W_inWindow_ptpair->Fill(pt_pair, W_mass, w);
+                        h2_Wmass_inWindow_ptpair_improved->Fill(pt_pair_improved, W_mass, w);
+                        prof_W_inWindow_ptpair_improved->Fill(pt_pair_improved, W_mass, w);
+                        h_ptpair_inWindow->Fill(pt_pair, w);
+                        h_ptpair_inWindow_improved->Fill(pt_pair_improved, w);
                         if (isMC || (runYear == 2025)){
                            bool isG1 = (flav1 == 21), isG2 = (flav2 == 21);
                            if      (isG1 && isG2) {
-                              h2_Wmass_inWindow_ptpair_gg->Fill(pt_pair, W_mass);
-                              prof_W_inWindow_ptpair_gg->Fill(pt_pair, W_mass);
-                              h_ptpair_inWindow_gg->Fill(pt_pair);
-                              h2_Wmass_inWindow_ptpair_improved_gg->Fill(pt_pair_improved, W_mass);
-                              prof_W_inWindow_ptpair_improved_gg->Fill(pt_pair_improved, W_mass);
-                              h_ptpair_inWindow_improved_gg->Fill(pt_pair_improved);
+                              h2_Wmass_inWindow_ptpair_gg->Fill(pt_pair, W_mass, w);
+                              prof_W_inWindow_ptpair_gg->Fill(pt_pair, W_mass, w);
+                              h_ptpair_inWindow_gg->Fill(pt_pair, w);
+                              h2_Wmass_inWindow_ptpair_improved_gg->Fill(pt_pair_improved, W_mass, w);
+                              prof_W_inWindow_ptpair_improved_gg->Fill(pt_pair_improved, W_mass, w);
+                              h_ptpair_inWindow_improved_gg->Fill(pt_pair_improved, w);
                            }
                            else if (isG1 != isG2) {
-                              h2_Wmass_inWindow_ptpair_qg->Fill(pt_pair, W_mass);
-                              prof_W_inWindow_ptpair_qg->Fill(pt_pair, W_mass);
-                              h_ptpair_inWindow_qg->Fill(pt_pair);
-                              h2_Wmass_inWindow_ptpair_improved_qg->Fill(pt_pair_improved, W_mass);
-                              prof_W_inWindow_ptpair_improved_qg->Fill(pt_pair_improved, W_mass);
-                              h_ptpair_inWindow_improved_qg->Fill(pt_pair_improved);
+                              h2_Wmass_inWindow_ptpair_qg->Fill(pt_pair, W_mass, w);
+                              prof_W_inWindow_ptpair_qg->Fill(pt_pair, W_mass, w);
+                              h_ptpair_inWindow_qg->Fill(pt_pair, w);
+                              h2_Wmass_inWindow_ptpair_improved_qg->Fill(pt_pair_improved, W_mass, w);
+                              prof_W_inWindow_ptpair_improved_qg->Fill(pt_pair_improved, W_mass, w);
+                              h_ptpair_inWindow_improved_qg->Fill(pt_pair_improved, w);
                            }
                            else if (qqPairs(flav1, flav2)){
-                              h2_Wmass_inWindow_ptpair_qq->Fill(pt_pair, W_mass);
-                              prof_W_inWindow_ptpair_qq->Fill(pt_pair, W_mass);
-                              h_ptpair_inWindow_qq->Fill(pt_pair);
-                              h2_Wmass_inWindow_ptpair_improved_qq->Fill(pt_pair_improved, W_mass);
-                              prof_W_inWindow_ptpair_improved_qq->Fill(pt_pair_improved, W_mass);
-                              h_ptpair_inWindow_improved_qq->Fill(pt_pair_improved);
+                              h2_Wmass_inWindow_ptpair_qq->Fill(pt_pair, W_mass, w);
+                              prof_W_inWindow_ptpair_qq->Fill(pt_pair, W_mass, w);
+                              h_ptpair_inWindow_qq->Fill(pt_pair, w);
+                              h2_Wmass_inWindow_ptpair_improved_qq->Fill(pt_pair_improved, W_mass, w);
+                              prof_W_inWindow_ptpair_improved_qq->Fill(pt_pair_improved, W_mass, w);
+                              h_ptpair_inWindow_improved_qq->Fill(pt_pair_improved, w);
                            }
                            else {
-                              h2_Wmass_inWindow_ptpair_qq_others->Fill(pt_pair, W_mass);
-                              prof_W_inWindow_ptpair_qq_others->Fill(pt_pair, W_mass);
-                              h_ptpair_inWindow_qq_others->Fill(pt_pair);
-                              h2_Wmass_inWindow_ptpair_improved_qq_others->Fill(pt_pair_improved, W_mass);
-                              prof_W_inWindow_ptpair_improved_qq_others->Fill(pt_pair_improved, W_mass);
-                              h_ptpair_inWindow_improved_qq_others->Fill(pt_pair_improved);
+                              h2_Wmass_inWindow_ptpair_qq_others->Fill(pt_pair, W_mass, w);
+                              prof_W_inWindow_ptpair_qq_others->Fill(pt_pair, W_mass, w);
+                              h_ptpair_inWindow_qq_others->Fill(pt_pair, w);
+                              h2_Wmass_inWindow_ptpair_improved_qq_others->Fill(pt_pair_improved, W_mass, w);
+                              prof_W_inWindow_ptpair_improved_qq_others->Fill(pt_pair_improved, W_mass, w);
+                              h_ptpair_inWindow_improved_qq_others->Fill(pt_pair_improved, w);
                            }
                         }
                      }
@@ -1183,15 +1214,15 @@ void WMassRun3::Loop()
                    // Only fill when jets pass η cuts
                    if (!heavyFallback && secondLightJet >= 0 && fabs(lj1_p4.Eta()) < 1.3 && fabs(lj2_p4.Eta()) < 1.3) {
                        // Fill diagonal‐window histograms
-                       h_Wmass_diagWindow->Fill(W_mass);
-                       h_ptpair_diagWindow->Fill(pt_pair);
-                       h2_Wmass_ptpair_diagWindow->Fill(pt_pair, W_mass);
-                       prof_W_diagWindow_ptpair->Fill(pt_pair, W_mass);
-                       prof_ptpair_diagWindow_mass->Fill(W_mass, pt_pair);
+                       h_Wmass_diagWindow->Fill(W_mass, w);
+                       h_ptpair_diagWindow->Fill(pt_pair, w);
+                       h2_Wmass_ptpair_diagWindow->Fill(pt_pair, W_mass, w);
+                       prof_W_diagWindow_ptpair->Fill(pt_pair, W_mass, w);
+                       prof_ptpair_diagWindow_mass->Fill(W_mass, pt_pair, w);
                    }
                }
                if ((W_mass > 40 && W_mass < 140.) && (Top_mass_improved > 120. && Top_mass_improved < 230.)){
-                  h_Topmass_inWindow_improved->Fill(Top_mass_improved);
+                  h_Topmass_inWindow_improved->Fill(Top_mass_improved, w);
                }
 
 

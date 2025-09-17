@@ -47,6 +47,19 @@ public :
 
 // Fixed size dimensions of array or collections stored in the TTree if any.
 
+
+   // Extras for MC
+
+   Float_t         genWeight;
+   Int_t           nGenJet; // NanoV12
+   Float_t         GenJet_eta[100];   //[nGenJet]
+   Float_t         GenJet_mass[100];   //[nGenJet]
+   Float_t         GenJet_phi[100];   //[nGenJet]
+   Float_t         GenJet_pt[100];   //[nGenJet]
+   Short_t         GenJet_partonFlavour[100]; //[nGenJet] // NanoV12
+   Int_t           nPSWeight; // NanoV12
+   Float_t         PSWeight[46];   //[nPSWeight]
+
    // Declaration of leaf types
    UInt_t          run;
    UInt_t          luminosityBlock;
@@ -1872,6 +1885,17 @@ public :
    Bool_t          HLTriggerFinalPath;
    Bool_t          Dataset_ScoutingPFMonitor;
    Bool_t          Dataset_ScoutingPFRun3;
+
+      // Extras for MC
+   TBranch        *b_genWeight;
+   TBranch        *b_nPSWeight;   //!
+   TBranch        *b_PSWeight;   //!
+   TBranch        *b_nGenJet;   //!
+   TBranch        *b_GenJet_eta;   //!
+   TBranch        *b_GenJet_mass;   //!
+   TBranch        *b_GenJet_phi;   //!
+   TBranch        *b_GenJet_pt;   //!
+   TBranch        *b_GenJet_partonFlavour;   //!
 
    // List of branches
    TBranch        *b_run;   //!
@@ -3786,6 +3810,34 @@ void WMassRun3::Init(TTree *tree)
       fChain->SetBranchAddress("Jet_partonFlavour",
                               Jet_partonFlavour,
                               &b_Jet_partonFlavour);
+   }
+   if (fChain->GetBranch("genWeight")) {
+      fChain->SetBranchAddress("genWeight", &genWeight, &b_genWeight);
+   }
+   if (fChain->GetBranch("nPSWeight")) {
+      fChain->SetBranchAddress("nPSWeight", &nPSWeight, &b_nPSWeight);
+   }
+   if (fChain->GetBranch("PSWeight")) {
+      fChain->SetBranchAddress("PSWeight", PSWeight, &b_PSWeight);
+   }
+
+   if (fChain->GetBranch("nGenJet")) {
+      fChain->SetBranchAddress("nGenJet", &nGenJet, &b_nGenJet);
+   }
+   if (fChain->GetBranch("GenJet_eta")) {
+      fChain->SetBranchAddress("GenJet_eta", GenJet_eta, &b_GenJet_eta);
+   }
+   if (fChain->GetBranch("GenJet_mass")) {
+      fChain->SetBranchAddress("GenJet_mass", GenJet_mass, &b_GenJet_mass);
+   }
+   if (fChain->GetBranch("GenJet_phi")) {
+      fChain->SetBranchAddress("GenJet_phi", GenJet_phi, &b_GenJet_phi);
+   }
+   if (fChain->GetBranch("GenJet_pt")) {
+      fChain->SetBranchAddress("GenJet_pt", GenJet_pt, &b_GenJet_pt);
+   }
+   if (fChain->GetBranch("GenJet_partonFlavour")) {
+      fChain->SetBranchAddress("GenJet_partonFlavour", GenJet_partonFlavour, &b_GenJet_partonFlavour);
    }
 
    fChain->SetBranchAddress("run", &run, &b_run);

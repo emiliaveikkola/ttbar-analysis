@@ -200,14 +200,20 @@ void WMassRun3::Loop()
    //fout = new TFile("Summer24_TTtoLNu2Q.root", "RECREATE");
    // Year-based configuration
    static const int runYear = 2025; // set to 2024 or 2025
-   static const std::string runEra = "C"; // for 2025: "A", "B", etc.
+   static const std::string runEra = "F"; // for 2025: "A", "B", etc.
    std::string jsonFile, jecMCSet, jecDataSet, outputFile, jetVetoMap;
    bool isMC = false;
-   if (isMC) {
+   if (isMC && (runYear == 2024)) {
        jsonFile   = "Cert_Collisions2024_378981_386951_Golden.json";
        jecMCSet   = "RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI"; //Winter24Run3_V1_MC_L2Relative_AK4PUPPI //RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI
        jetVetoMap = "jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root"; //jet_veto_maps/Winter24Prompt24/Winter24Prompt24_2024BCDEFGHI.root //jetvetoReReco2024_V9M.root
        outputFile = "Summer24_TTtoLNu2Q.root";
+   }
+   else if (isMC && (runYear == 2025)) {
+       jsonFile   = "Cert_Collisions2025_391658_396422_Golden.json";
+       jecMCSet   = "Winter25Run3_V1_MC_L2Relative_AK4PUPPI"; //Winter24Run3_V1_MC_L2Relative_AK4PUPPI //RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI
+       jetVetoMap = "jet_veto_maps/jetveto2025CDE_V2M.root"; //jet_veto_maps/Winter24Prompt24/Winter24Prompt24_2024BCDEFGHI.root //jetvetoReReco2024_V9M.root
+       outputFile = "Winter25_TTtoLNu2Q.root";
    }
    else if (runYear == 2024) {
        jsonFile   = "Cert_Collisions2024_378981_386951_Golden.json";
@@ -234,6 +240,12 @@ void WMassRun3::Loop()
            jecDataSet = "Prompt25_V2M_DATA/Prompt25_Run2025E_V2M_DATA_L2L3Residual_AK4PFPuppi"; //"Prompt25_V1M_DATA";
            jetVetoMap = "jet_veto_maps/jetveto2025CDE_V2M.root"; //"jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               
            outputFile = "Muon_Run2025E_Prompt_V2M.root";
+       } else if (runEra == "F") {
+           jsonFile   = "daily_dials_2025-09-24.json"; //"Cert_Collisions2025D_daily_dials_12-08-2025.json"; //"Collisions25_13p6TeV_391658_395372_DCSOnly_TkPx.json";
+           jecMCSet   = "Winter25Run3_V1_MC_L2Relative_AK4PUPPI";
+           jecDataSet = "Prompt25_V2M_DATA/Prompt25_Run2025E_V2M_DATA_L2L3Residual_AK4PFPuppi"; //"Prompt25_V1M_DATA";
+           jetVetoMap = "jet_veto_maps/jetveto2025CDE_V2M.root"; //"jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               
+           outputFile = "Muon_Run2025F_Prompt_V2M.root";
        } else {
            std::cerr << "Unsupported runEra: " << runEra << std::endl;
            return;
@@ -459,18 +471,8 @@ void WMassRun3::Loop()
        jec = getFJC("", jecMCSet, "");
        assert(jec);
    } else if (runYear == 2025){
-         if (runEra == "C"){
-            jec = getFJC("", jecMCSet, jecDataSet);
-            assert(jec);
-         }
-         else if (runEra == "D"){
-            jec = getFJC("", jecMCSet, jecDataSet);
-            assert(jec);
-         }
-         else if (runEra == "E"){
-            jec = getFJC("", jecMCSet, jecDataSet);
-            assert(jec);
-         }
+      jec = getFJC("", jecMCSet, jecDataSet);
+      assert(jec);
    } else { //2024 with fibs.txt
        jec2024 = new FactorizedJetCorrectorWrapper();
        jec2024->addJECset(jecDataSet);

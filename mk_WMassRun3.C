@@ -7,6 +7,9 @@
 
 #include "CondFormats/JetMETObjects/interface/FactorizedJetCorrectorWrapper.h"
 
+#include "CondFormats/JetMETObjects/interface/JetResolutionObject.h"
+#include "CondFormats/JetMETObjects/interface/JetResolution.h"
+
 #include "WMassRun3.h"
 
 #include "TSystem.h"
@@ -80,7 +83,7 @@ void AddFilesRecursively(const TString &dirPath, TChain *chain) {
       if (file->IsDirectory()) {
          // Always recurse into directories
          AddFilesRecursively(fullPath, chain);
-      } else if (fname.EndsWith(".root") && fullPath.Contains("date-24Sep2025_time-114102_commit-53ad610")) { 
+      } else if (fname.EndsWith(".root") && fullPath.Contains("date-29Sep2025_time-140649_commit-53ad610")) { 
          //MC: date-14May2025_time-124123_commit-23dc684
          //CDE DataReprocessing: date-08May2025_time-160559_commit-23dc684
          //FGHI Prompt24: date-20May2025_time-131924_commit-23dc684
@@ -89,7 +92,7 @@ void AddFilesRecursively(const TString &dirPath, TChain *chain) {
          //2025D: date-04Aug2025_time-123721_commit-23dc684
          //2025E: date-11Sep2025_time-082745_commit-e998a03
          //2025F: date-24Sep2025_time-114102_commit-53ad610
-         //MCWinter25: date-17Sep2025_time-102845_commit-6ad4a3d
+         //MCWinter25: date-29Sep2025_time-140649_commit-53ad610
          std::cout << "Adding file: " << fullPath.Data() << std::endl;
          chain->AddFile(fullPath);
       }
@@ -108,8 +111,8 @@ void mk_WMassRun3() {
    //TString mainDirectory = "/eos/user/e/eveikkol/Skim/Wqqm/2025/Data/2025C/";
    //TString mainDirectory = "/eos/user/e/eveikkol/Skim/Wqqm/2025/Data/2025D/";
    //TString mainDirectory = "/eos/user/e/eveikkol/Skim/Wqqm/2025/Data/2025E/";
-   TString mainDirectory = "/eos/user/e/eveikkol/Skim/Wqqm/2025/Data/2025F/";
-   //TString mainDirectory = "/eos/user/e/eveikkol/Skim/Wqqm/2025/MCWinter25/";
+   //TString mainDirectory = "/eos/user/e/eveikkol/Skim/Wqqm/2025/Data/2025F/";
+   TString mainDirectory = "/eos/user/e/eveikkol/Skim/Wqqm/2025/MCWinter25/";
 
    // Recursively add all ROOT files found under the main directory.
    AddFilesRecursively(mainDirectory, c);

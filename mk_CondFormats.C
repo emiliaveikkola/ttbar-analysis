@@ -12,5 +12,8 @@
 
   gROOT->ProcessLine(".L CondFormats/JetMETObjects/src/FactorizedJetCorrectorWrapper.cc+");
 
+  gROOT->ProcessLine(".L CondFormats/JetMETObjects/src/JetResolutionObject.cc+");
+  gROOT->ProcessLine(".L CondFormats/JetMETObjects/src/JetResolution.cc+");
+
   gROOT->ProcessLine(".L WMassRun3.C+g");
 }

@@ -3,6 +3,7 @@
 #include <TH2.h>
 #include <TH2D.h>
 #include <TH3.h>
+#include <TH3D.h>
 #include <TH1.h>
 #include <TStyle.h>
 #include <TCanvas.h>
@@ -16,11 +17,19 @@
 #include <ctime>
 #include <vector>
 #include "TMath.h"
+#include <random>
 #include <algorithm>
 #include <TLegend.h>
 #include <TColor.h>
 #include <TStopwatch.h>
 #include "tdrstyle_mod22.C"
+
+// --- JetMETObjects (standalone JEC/JER) ---
+#include "CondFormats/JetMETObjects/interface/JetCorrectorParameters.h"
+#include "CondFormats/JetMETObjects/interface/SimpleJetCorrector.h"
+#include "CondFormats/JetMETObjects/interface/FactorizedJetCorrector.h"
+#include "CondFormats/JetMETObjects/interface/JetResolutionObject.h"
+#include "CondFormats/JetMETObjects/interface/JetResolution.h"
 
 bool _gh_debug = false;
 
@@ -201,8 +210,22 @@ void WMassRun3::Loop()
    // Year-based configuration
    static const int runYear = 2025; // set to 2024 or 2025
    static const std::string runEra = "F"; // for 2025: "A", "B", etc.
-   std::string jsonFile, jecMCSet, jecDataSet, outputFile, jetVetoMap;
-   bool isMC = false;
+   std::string jsonFile, jecMCSet, jecDataSet, outputFile, jetVetoMap, JERSFvsPt, JERres;
+
+   bool isMC = true;
+   // JER smearing (JER SF)
+   bool smearJets = true;
+   bool useJERSFvsPt = false; // new file format
+   int smearNMax = 3;
+   std::uint32_t _seed;
+   std::mt19937 _mersennetwister;
+   if (isMC && smearJets) {
+      _seed = 4;
+		_mersennetwister = std::mt19937(_seed);
+   }
+
+   string jerpath(""), jerpathsf("");
+
    if (isMC && (runYear == 2024)) {
        jsonFile   = "Cert_Collisions2024_378981_386951_Golden.json";
        jecMCSet   = "RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI"; //Winter24Run3_V1_MC_L2Relative_AK4PUPPI //RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI
@@ -213,7 +236,11 @@ void WMassRun3::Loop()
        jsonFile   = "Cert_Collisions2025_391658_396422_Golden.json";
        jecMCSet   = "Winter25Run3_V1_MC_L2Relative_AK4PUPPI"; //Winter24Run3_V1_MC_L2Relative_AK4PUPPI //RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI
        jetVetoMap = "jet_veto_maps/jetveto2025CDE_V2M.root"; //jet_veto_maps/Winter24Prompt24/Winter24Prompt24_2024BCDEFGHI.root //jetvetoReReco2024_V9M.root
-       outputFile = "Winter25_TTtoLNu2Q.root";
+       // JER Scale Factors (pt-dependent via FactorizedJetCorrector)
+       JERSFvsPt = "Prompt25_V2M_MC/Prompt25_2025CDE_JRV2M_MC_SF_AK4PFPuppi"; //"ReReco24_2024_nib_JRV10M_MC_SF_AK4PFPuppi";
+       // JER resolution (Pt Resolution txt)
+       JERres   = "Summer23BPixPrompt23_RunD_JRV1_MC_PtResolution_AK4PFPuppi.txt";
+       outputFile = "test.root"; //"Winter25_TTtoLNu2Q.root";
    }
    else if (runYear == 2024) {
        jsonFile   = "Cert_Collisions2024_378981_386951_Golden.json";
@@ -260,6 +287,18 @@ void WMassRun3::Loop()
       fChain->SetBranchStatus("Jet_hadronFlavour", 1);
       fChain->SetBranchStatus("Jet_partonFlavour", 1);
       fChain->SetBranchStatus("genWeight", 1);
+      fChain->SetBranchStatus("GenVtx_z", 1);
+		fChain->SetBranchStatus("PV_z", 1);
+         // For JER smearing
+      if (smearJets) {
+         fChain->SetBranchStatus("Jet_genJetIdx", 1);
+         fChain->SetBranchStatus("nGenJet", 1);
+         fChain->SetBranchStatus("GenJet_pt", 1);
+         fChain->SetBranchStatus("GenJet_eta", 1);
+         fChain->SetBranchStatus("GenJet_phi", 1);
+         fChain->SetBranchStatus("GenJet_mass", 1);
+         fChain->SetBranchStatus("Rho_fixedGridRhoFastjetAll", 1);
+      }
    }
 
    TH1::SetDefaultSumw2();
@@ -411,6 +450,57 @@ void WMassRun3::Loop()
    TH1D* h_rbl = new TH1D("h_rbl", ";; Events", 100, 0, 5);
    TH1D* h_rbl_inWindow = new TH1D("h_rbl_inWindow", ";; Events", 100, 0, 5);
 
+   // Sum of generator weights (for later normalization)
+   TH1D* h_sumw = new TH1D("h_sumw", ";bin;sumw", 1, 0, 1);
+
+   // Smearing controls
+  TProfile2D *p2jsf, *p2jsftc, *p2jsfpf;
+
+
+     // --- JER control plots (same binning and names as DijetHistosFill.C) ---
+   // pT,avp (HDM) binning (GeV)
+   double vptd[] = {15, 20, 25, 30, 35, 40, 50, 60, 75, 90, 110, 130, 175, 230,
+                  300, 400, 500, 600, 700, 850, 1000, 1200, 1450, 1750,
+                  2100, 2500, 3000};
+   const int nptd = int(sizeof(vptd)/sizeof(vptd[0])) - 1;
+
+   // |eta| binning
+   double vxd[]  = {0.00, 0.13, 0.26, 0.39, 0.52, 0.65, 0.78, 0.91, 1.04, 1.17, 1.30,
+                  1.44, 1.57, 1.74, 1.93, 2.10, 2.30, 2.50};
+   const int nxd = int(sizeof(vxd)/sizeof(vxd[0])) - 1;
+
+   // p_reco/p_gen binning
+   int reco_nedges = 101;
+   double minValue = 0.0;
+   double maxValue = 2.0;
+   double stepSize = (maxValue - minValue) / (reco_nedges - 1);
+      // Create the vector
+   std::vector<double> vres(reco_nedges);
+
+   // Populate the vector with values
+   for (int i = 0; i < reco_nedges; ++i) {
+         vres[i] = minValue + i * stepSize;
+   }
+   const int nres = sizeof(vres) / sizeof(vres[0]) - 1;
+
+     // --- JME gen-matched validation histograms ---
+   // (per-jet validation vs gen pT and eta)
+   TH2D* h2pteta = new TH2D("h2pteta", ";|#eta_{reco}|;p_{T}^{gen} (GeV)", nxd, vxd, nptd, vptd);
+   TH2D* h2pteta_gEta = new TH2D("h2pteta_gEta", ";|#eta_{gen}|;p_{T}^{gen} (GeV)", nxd, vxd, nptd, vptd);
+   TProfile2D* p2jes_gm = new TProfile2D("p2jes_gm", ";|#eta_{reco}|;p_{T}^{gen} (GeV); (1-rawFactor)", nxd, vxd, nptd, vptd);
+   TProfile2D* p2jsf_gm = new TProfile2D("p2jsf_gm", ";|#eta_{reco}|;p_{T}^{gen} (GeV); JER SF (Jet_CF)", nxd, vxd, nptd, vptd);
+   TProfile2D* p2r_gm   = new TProfile2D("p2r_gm",   ";|#eta_{reco}|;p_{T}^{gen} (GeV); p_{T}^{reco}/p_{T}^{gen}", nxd, vxd, nptd, vptd);
+   TProfile2D* p2r_gEta = new TProfile2D("p2r_gEta", ";|#eta_{gen}|;p_{T}^{gen} (GeV); p_{T}^{reco}/p_{T}^{gen}", nxd, vxd, nptd, vptd);
+   TProfile2D* p2r_raw  = new TProfile2D("p2r_raw",  ";|#eta_{reco}|;p_{T}^{gen} (GeV); p_{T}^{raw}/p_{T}^{gen}", nxd, vxd, nptd, vptd);
+   TH3D* h3res_Match = new TH3D("h3res_Match", ";#eta^{gen};p_{T}^{gen} (GeV);p_{T}^{reco}/p_{T}^{gen}", nxd, vxd, nptd, vptd, vres.size()-1, vres.data());
+   TH3D* h3res_raw   = new TH3D("h3res_raw",   ";#eta^{gen};p_{T}^{gen} (GeV);p_{T}^{raw}/p_{T}^{gen}",   nxd, vxd, nptd, vptd, vres.size()-1, vres.data());
+
+   // Profiles
+   p2jsf   = new TProfile2D("p2jsf",   ";|#eta_{jet}|;p_{T,avp} (GeV);JERSF(jet)",         nxd, vxd,  nptd, vptd);
+   p2jsftc = new TProfile2D("p2jsftc", ";|#eta_{tag}|;p_{T,tag} (GeV);JERSF(tag)",         nxd, vxd,  nptd, vptd);
+   p2jsfpf = new TProfile2D("p2jsfpf", ";|#eta_{probe}|;p_{T,probe} (GeV);JERSF(probe)/JERSF(tag)", nxd, vxd,  nptd, vptd);
+   // -------------------------------------------------------------------------
+
 
    curdir->cd();
    Long64_t nentries = fChain->GetEntries();
@@ -425,11 +515,10 @@ void WMassRun3::Loop()
    //nentries = 1000000;
 
    TLorentzVector p4jet, lhe, jet, jet2, jetn;
-   TLorentzVector gamorig; // for QCD bkg
    TLorentzVector met, met1, metn, metu, metnu, rawmet, corrmet, rawgam;
    TLorentzVector jeti, corrjets, rawjet, rawjets, rcjet, rcjets, rcoffsets;
    TLorentzVector geni, genjet, genjet2;
-   TLorentzVector fox; // for isQCD
+   TLorentzVector p4, p4g;
    TLorentzVector lj1_p4, lj2_p4, W_p4, singleJetW_p4, top1_p4, top2_p4, b1_p4, b2_p4, muon_p4, b1l_p4, b2l_p4, toph_p4, mbl_p4, bl_p4, bh_p4, toph_improved_p4, W_improved_p4;
 
    int _ntot(0), _nevents(0), _nbadevents_json(0), _nbadevents_trigger(0);
@@ -454,7 +543,7 @@ void WMassRun3::Loop()
 
    // Pointers for JEC
    FactorizedJetCorrectorWrapper *jec2024(0);
-   FactorizedJetCorrector *jec(0);
+   FactorizedJetCorrector *jec(0), *jersfvspt(0);;
 
    // Initialize JEC according to mode
    //if (isMC) {
@@ -470,6 +559,14 @@ void WMassRun3::Loop()
    if (isMC) {
        jec = getFJC("", jecMCSet, "");
        assert(jec);
+       if (smearJets) {
+         jerpathsf = Form("CondFormats/JetMETObjects/data/%s.txt", JERSFvsPt.c_str());
+         jersfvspt = getFJC("", JERSFvsPt, "");
+         // JER resolution (Pt Resolution txt)
+         jerpath   = Form("CondFormats/JetMETObjects/data/%s", JERres.c_str());
+         // Tell the smearing code to use the pt-dependent SF provider
+         useJERSFvsPt = true;
+       }
    } else if (runYear == 2025){
       jec = getFJC("", jecMCSet, jecDataSet);
       assert(jec);
@@ -478,7 +575,6 @@ void WMassRun3::Loop()
        jec2024->addJECset(jecDataSet);
        assert(jec2024);
    }
-
    //FactorizedJetCorrectorWrapper *jec = new FactorizedJetCorrectorWrapper();
    //jec->addJECset("Prompt24_V8M_DATA");
    //jec->addJECset("Reprocessing24_V8M_DATA");
@@ -514,6 +610,31 @@ void WMassRun3::Loop()
    std::vector<int> gluonJetIndices;
    gluonJetIndices.reserve(nJet);
 
+   // Smear JER
+	JME::JetResolution *jer(0);
+	JME::JetResolutionScaleFactor *jersf(0);
+
+   if (isMC && smearJets)
+   {
+   std::cout << jerpath << std::endl << std::flush;
+   if (!useJERSFvsPt)
+      std::cout << jerpathsf << std::endl << std::flush;
+
+   if (jerpath == "" || (jerpathsf == "" && !useJERSFvsPt))
+      std::cout << "Missing JER file paths" << std::endl << std::flush;
+
+   assert(jerpath != "");
+   assert(jerpathsf != "" || useJERSFvsPt);
+   assert(jersfvspt || !useJERSFvsPt);
+
+   jer = new JME::JetResolution(jerpath.c_str());
+   if (!useJERSFvsPt)
+      jersf = new JME::JetResolutionScaleFactor(jerpathsf.c_str());
+
+   if (!jer || (!jersf && !useJERSFvsPt) || (!jersfvspt && useJERSFvsPt))
+      std::cout << "Missing JER files" << std::endl << std::flush;
+   }
+
    for (Long64_t jentry=0; jentry<nentries;jentry++) {
       Long64_t ientry = LoadTree(jentry);
       if (ientry < 0) break;
@@ -543,6 +664,8 @@ void WMassRun3::Loop()
          else 
             ++_nevents;
       }
+         double w = (isMC ? genWeight : 1);    //in case of MC set w to genWeight, otherwise (data) leave it 1
+         if (isMC) h_sumw->Fill(0.5, genWeight);
          // Select leading jets. Just exclude muon, don't apply JetID yet
          static const int nJetMax = 200;
          Float_t         Jet_resFactor[nJetMax]; // Custom addition
@@ -617,6 +740,132 @@ void WMassRun3::Loop()
                }
             }
          } // for i in nJet 
+
+         int njet = nJet;
+         if (isMC && smearJets) {
+            for (int i = 0; i != njet; ++i) {
+               Jet_CF[i] = 1.;
+               if (i < smearNMax) {
+                  // Retrieve genJet and calculate dR
+                  double dR(999);
+                  p4.SetPtEtaPhiM(Jet_pt[i], Jet_eta[i], Jet_phi[i], Jet_mass[i]);
+
+
+                  if (Jet_genJetIdx[i] >= 0 ){ // && Jet_genJetIdx[i] < nGenJet)
+                     int j = Jet_genJetIdx[i];
+                     p4g.SetPtEtaPhiM(GenJet_pt[j], GenJet_eta[j], GenJet_phi[j],
+                                    GenJet_mass[j]);
+                     dR = p4g.DeltaR(p4);
+                  }
+                  else
+                     p4g.SetPtEtaPhiM(0, 0, 0, 0);
+
+
+                  // Rename variables to keep naming as in jetphys/IOV.h.
+                  double jPt = Jet_pt[i];
+                  double jEta = Jet_eta[i];
+                  double rho = Rho_fixedGridRhoFastjetAll;
+                  double jE = p4.E();
+                  double jPtGen = p4g.Pt();
+                  // Set constants
+                  double MIN_JET_ENERGY = 0.01; // TBD
+
+
+                  // Some problems with the code below:
+                  // 1) JER should us primarily genPt, secondary recoPt
+                  // 2) relDpt  should evaluate vs genPt to avoid <1/x> != 1/<x> bias
+                  // 3) For (JME)NANO, should also check DR of genJet
+                  // Probably small impact except for the last, which I add
+
+
+                  // The method presented here can be found in https://twiki.cern.ch/twiki/bin/viewauth/CMS/JetResolution
+                  // and the corresponding code in https://github.com/cms-sw/cmssw/blob/CMSSW_8_0_25/PhysicsTools/PatUtils/interface/SmearedJetProducerT.h
+                  assert(jer);
+                  double Reso = jer->getResolution({{JME::Binning::JetPt, jPt}, {JME::Binning::JetEta, jEta}, {JME::Binning::Rho, rho}});
+                  double SF(1);
+                  if (useJERSFvsPt && jersfvspt) {
+                     jersfvspt->setJetEta(jEta);
+                     jersfvspt->setJetPt(jPt);
+                     jersfvspt->setRho(rho);
+                     SF = jersfvspt->getCorrection();
+                  }
+                  else if (!useJERSFvsPt && jersf){
+                     SF = jersf->getScaleFactor({{JME::Binning::JetEta, jEta}, {JME::Binning::Rho, rho}}, Variation::NOMINAL);
+                  //cout << "JER SF from jersf path" << endl;
+                  }
+                  else {
+                     cout << "No JER SF available" << endl << flush;
+                     assert(false);
+                  }
+
+
+                  // Case 0: by default the JER correction factor is equal to 1
+                  double CF = 1.;
+                  // We see if the gen jet meets our requirements
+                  bool condPt = (jPtGen > MIN_JET_ENERGY && dR < 0.2);
+                  double relDPt = condPt ? (jPt - jPtGen) / jPt : 0.0;
+                  bool condPtReso = fabs(relDPt) < 3 * Reso;
+                  if (condPt and condPtReso) {
+                     // Case 1: we have a "good" gen jet matched to the reco jet (indicated by positive gen jet pt)
+                     CF += (SF - 1.) * relDPt;
+                  }
+                  else if (SF > 1) {
+                     // Case 2: we don't have a gen jet. Smear jet pt using a random gaussian variation
+                     double sigma = Reso * std::sqrt(SF * SF - 1);
+                     std::normal_distribution<> d(0, sigma);
+                     CF += d(_mersennetwister);
+                  }
+
+
+                  // Negative or too small smearFactor. Safety precautions.
+                  double CFLimit = MIN_JET_ENERGY / jE;
+                  if (CF < CFLimit)
+                     CF = CFLimit;
+
+
+                  double origPt = Jet_pt[i];
+                  double origJetMass = Jet_mass[i];
+                  Jet_pt[i] = CF * origPt;
+                  Jet_mass[i] = CF * origJetMass;
+                  Jet_CF[i] = CF;
+                  // Jet_smearFactor[i] = (1.0 - 1.0/CF);
+                                    // --- JME validation: fill gen-matched per-jet histos ---
+                  // Use gen match if available and close in dR
+                  bool hasMatchVtx = (fabs(PV_z - GenVtx_z) < 0.2);
+                  bool hasMatchJet = (dR < 0.2 && p4g.Pt() > 0 && p4.Pt() > 0);
+                  if (hasMatchVtx && hasMatchJet) {
+
+                     // Reco and raw pT
+                     double pt_reco = p4.Pt();
+                     double pt_raw  = Jet_pt[i] * (1.0 - Jet_rawFactor[i]);
+                     double pt_gen  = p4g.Pt();
+
+                     // 2D occupancy vs |eta| and gen pT
+                     h2pteta->Fill(fabs(p4.Eta()),  pt_gen, w);
+                     h2pteta_gEta->Fill(fabs(p4g.Eta()), pt_gen, w);
+
+                     // Profiles: raw factor, applied JER SF, and responses
+                     p2jes_gm->Fill(fabs(p4.Eta()),  pt_gen, (1.0 - Jet_rawFactor[i]), w);
+                     p2jsf_gm->Fill(fabs(p4.Eta()),  pt_gen, (smearJets ? Jet_CF[i] : 1.0), w);
+
+                     double resp     = (pt_gen > 0.0 ? pt_reco/pt_gen : 0.0);
+                     double resp_raw = (pt_gen > 0.0 ? pt_raw /pt_gen : 0.0);
+
+                     p2r_gm->Fill(fabs(p4.Eta()),  pt_gen, resp,     w);
+                     p2r_gEta->Fill(fabs(p4g.Eta()), pt_gen, resp,     w);
+                     p2r_raw->Fill(fabs(p4.Eta()),  pt_gen, resp_raw, w);
+
+                     // 3D response maps (eta_gen, pt_gen, response)
+                     h3res_Match->Fill(p4g.Eta(), pt_gen, resp,     w);
+                     h3res_raw->Fill(  p4g.Eta(), pt_gen, resp_raw, w);
+                  }
+
+
+                  // type-I calculation is done later and propagates JER SF
+                  // (needs to have unsmeard p4lr1c, fully smeared p4)
+               } // i<smearNMax
+            }   // for njet
+         }     // JER smearing
       
          // Met filtterit (Noise filter 2024):
 
@@ -649,8 +898,6 @@ void WMassRun3::Loop()
          rawmet.SetPtEtaPhiM(RawPuppiMET_pt, 0, RawPuppiMET_phi, 0);
 
          bool pass_basic = (pass_trig && pass_filt && pass_jetveto);
-
-         double w = 1; //(isMC ? genWeight : 1);    //in case of MC set w to genWeight, otherwise (data) leave it 1
 
          // ========== Independent check: At least 3 jets, 1 b-tag ==========
          int nSelectedJets = 0;
@@ -860,6 +1107,39 @@ void WMassRun3::Loop()
                } else {
                   // No heavy jet: form W from both light jets
                   W_p4 = lj1_p4 + lj2_p4;
+               }
+
+                // --- JER control histos (HDM method) ---
+               if (isMC && smearJets && !heavyFallback && secondLightJet >= 0) {
+                  // Tag/probe jets (leading = tag, subleading = probe)
+                  const int itag   = leadLightJet;
+                  const int iprobe = secondLightJet;
+
+                  TLorentzVector p4t, p4p;
+                  p4t.SetPtEtaPhiM(Jet_pt[itag],   Jet_eta[itag],   Jet_phi[itag],   Jet_mass[itag]);
+                  p4p.SetPtEtaPhiM(Jet_pt[iprobe], Jet_eta[iprobe], Jet_phi[iprobe], Jet_mass[iprobe]);
+
+                  // --- HDM bisector ---
+                  TLorentzVector p4b, p4bt, p4bp, p4bx;
+                  p4b.SetPtEtaPhiM(0,0,0,0);
+                  p4bt.SetPtEtaPhiM(1,0,p4t.Phi(),0);
+                  p4bp.SetPtEtaPhiM(1,0,p4p.Phi(),0);
+                  p4b += p4bt;
+                  p4b -= p4bp;
+                  p4b.SetPtEtaPhiM(p4b.Pt(),0.,p4b.Phi(),0.);
+                  p4b *= 1./p4b.Pt();
+                  p4bx.SetPtEtaPhiM(p4b.Pt(),0.,p4b.Phi()+0.5*TMath::Pi(),0.);
+
+                  const double ptavp2 = 0.5 * (p4t.Vect().Dot(p4b.Vect()) - p4p.Vect().Dot(p4b.Vect()));
+
+                  const double jsf_tag   = Jet_CF[itag];
+                  const double jsf_probe = Jet_CF[iprobe];
+                  const double abseta_tag   = std::abs(p4t.Eta());
+                  const double abseta_probe = std::abs(p4p.Eta());
+
+                  p2jsf   ->Fill(abseta_probe, ptavp2,   jsf_probe, w);
+                  p2jsftc ->Fill(abseta_tag,   p4t.Pt(), jsf_tag, w);
+                  p2jsfpf ->Fill(abseta_probe, p4p.Pt(), (jsf_tag!=0.0 ? jsf_probe/jsf_tag : 0.0), w);
                }
 
                top1_p4 = b1_p4 + W_p4;

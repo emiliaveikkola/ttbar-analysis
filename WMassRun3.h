@@ -59,6 +59,8 @@ public :
    Short_t         GenJet_partonFlavour[100]; //[nGenJet] // NanoV12
    Int_t           nPSWeight; // NanoV12
    Float_t         PSWeight[46];   //[nPSWeight]
+   Short_t         Jet_genJetIdx[200];   //[nJet]
+   Float_t         GenVtx_z;
 
    // Declaration of leaf types
    UInt_t          run;
@@ -1896,6 +1898,8 @@ public :
    TBranch        *b_GenJet_phi;   //!
    TBranch        *b_GenJet_pt;   //!
    TBranch        *b_GenJet_partonFlavour;   //!
+   TBranch        *b_Jet_genJetIdx;   //!
+   TBranch        *b_GenVtx_z;   //!
 
    // List of branches
    TBranch        *b_run;   //!
@@ -3838,6 +3842,14 @@ void WMassRun3::Init(TTree *tree)
    }
    if (fChain->GetBranch("GenJet_partonFlavour")) {
       fChain->SetBranchAddress("GenJet_partonFlavour", GenJet_partonFlavour, &b_GenJet_partonFlavour);
+   }
+
+   if (fChain->GetBranch("Jet_genJetIdx")) {
+      fChain->SetBranchAddress("Jet_genJetIdx", Jet_genJetIdx, &b_Jet_genJetIdx);
+   }
+
+   if (fChain->GetBranch("GenVtx_z")) {
+      fChain->SetBranchAddress("GenVtx_z", &GenVtx_z, &b_GenVtx_z);
    }
 
    fChain->SetBranchAddress("run", &run, &b_run);

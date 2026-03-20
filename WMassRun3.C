@@ -474,13 +474,13 @@ void WMassRun3::Loop()
          outputFile = "Muon_Run2026A_Prompt_L2L32025G.root";
       } else if (runEra == "Bnib1") {
          jecMCSet   = "Run3Winter26_PhiDependent_L2Relative_AK4PUPPI";
-         outputFile = "Muon_Run2026Bnib1_Prompt_CombinedJSON.root";
+         outputFile = "Muon_Run2026Bnib1_Prompt_CombinedJSON_e1.root";
       } else if (runEra == "Bnib2") {
          jecMCSet   = "Run3Winter26_PhiDependent_L2Relative_AK4PUPPI";
-        outputFile = "Muon_Run2026Bnib2_Prompt_CombinedJSON.root";               
+        outputFile = "Muon_Run2026Bnib2_Prompt_CombinedJSON_e1.root";               
       } else if (runEra == "B") {
          jecMCSet   = "Run3Winter26_PhiDependent_L2Relative_AK4PUPPI";
-        outputFile = "Muon_Run2026B_Prompt_CombinedJSON.root";      
+        outputFile = "Muon_Run2026B_Prompt_CombinedJSON_e1.root";      
       }
    } else {
        std::cerr << "Unsupported runYear: " << runYear << std::endl;

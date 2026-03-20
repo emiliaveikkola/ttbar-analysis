@@ -61,6 +61,18 @@ public :
    Float_t         PSWeight[46];   //[nPSWeight]
    Short_t         Jet_genJetIdx[200];   //[nJet]
    Float_t         GenVtx_z;
+   Float_t         Pileup_nTrueInt;
+
+   // Gen particles
+   Int_t   nGenPart;
+   Float_t GenPart_pt[200];
+   Float_t GenPart_eta[200];
+   Float_t GenPart_phi[200];
+   Float_t GenPart_mass[200];
+   Int_t   GenPart_pdgId[200];
+   UShort_t   GenPart_statusFlags[200];
+   Int_t   GenPart_status[200];
+   Short_t   GenPart_genPartIdxMother[200];
 
    // Declaration of leaf types
    UInt_t          run;
@@ -1900,6 +1912,20 @@ public :
    TBranch        *b_GenJet_partonFlavour;   //!
    TBranch        *b_Jet_genJetIdx;   //!
    TBranch        *b_GenVtx_z;   //!
+
+   // --- GenPart branches ---
+   TBranch *b_nGenPart;                //!
+   TBranch *b_GenPart_pt;              //!
+   TBranch *b_GenPart_eta;             //!
+   TBranch *b_GenPart_phi;             //!
+   TBranch *b_GenPart_mass;            //!
+   TBranch *b_GenPart_pdgId;           //!
+   TBranch *b_GenPart_statusFlags;     //!
+   TBranch *b_GenPart_status;     //!
+   TBranch *b_GenPart_genPartIdxMother;//!
+
+   // --- Pileup branches ---
+   TBranch *b_Pileup_nTrueInt;         //!
 
    // List of branches
    TBranch        *b_run;   //!
@@ -3741,7 +3767,9 @@ public :
    void PrintInfo(string info, bool printcout);
    bool LoadJSON(string json);
    void LoadPU();
-   std::map<int, std::map<int, int> > _json;
+   bool LoadLumiAvgPU(const std::string& lumifile);
+   map<int, map<int, int> > _json;
+   map<int, map<int, float> > _avgpu;
    map<string, map<int, TH1D*> > _pu;
    map<string, map<int, double> >  _lumi;
 };
@@ -3851,6 +3879,46 @@ void WMassRun3::Init(TTree *tree)
    if (fChain->GetBranch("GenVtx_z")) {
       fChain->SetBranchAddress("GenVtx_z", &GenVtx_z, &b_GenVtx_z);
    }
+
+   if (fChain->GetBranch("nGenPart")) {
+      fChain->SetBranchAddress("nGenPart", &nGenPart, &b_nGenPart);
+   }
+
+   if (fChain->GetBranch("GenPart_pt")) {
+      fChain->SetBranchAddress("GenPart_pt", GenPart_pt, &b_GenPart_pt);
+   }
+
+   if (fChain->GetBranch("GenPart_eta")) {
+      fChain->SetBranchAddress("GenPart_eta", GenPart_eta, &b_GenPart_eta);
+   }
+
+   if (fChain->GetBranch("GenPart_phi")) {
+      fChain->SetBranchAddress("GenPart_phi", GenPart_phi, &b_GenPart_phi);
+   }
+
+   if (fChain->GetBranch("GenPart_mass")) {
+      fChain->SetBranchAddress("GenPart_mass", GenPart_mass, &b_GenPart_mass);
+   }
+
+   if (fChain->GetBranch("GenPart_pdgId")) {
+      fChain->SetBranchAddress("GenPart_pdgId", GenPart_pdgId, &b_GenPart_pdgId);
+   }
+
+   if (fChain->GetBranch("GenPart_statusFlags")) {
+      fChain->SetBranchAddress("GenPart_statusFlags", GenPart_statusFlags, &b_GenPart_statusFlags);
+   }
+
+   if (fChain->GetBranch("GenPart_status")) {
+      fChain->SetBranchAddress("GenPart_status", GenPart_status, &b_GenPart_status);
+   }
+
+   if (fChain->GetBranch("GenPart_genPartIdxMother")) {
+      fChain->SetBranchAddress("GenPart_genPartIdxMother", GenPart_genPartIdxMother, &b_GenPart_genPartIdxMother);
+   }
+
+   if (fChain->GetBranch("Pileup_nTrueInt")) {
+    fChain->SetBranchAddress("Pileup_nTrueInt", &Pileup_nTrueInt, &b_Pileup_nTrueInt);
+}
 
    fChain->SetBranchAddress("run", &run, &b_run);
    fChain->SetBranchAddress("luminosityBlock", &luminosityBlock, &b_luminosityBlock);

@@ -5,7 +5,7 @@ from pathlib import Path
 from datetime import date
 
 # Source file (unchanging name)
-p_in = Path("daily_dials.json")
+p_in = Path("CombinedJSONS_DCSCMLE_Runs_401624to402040.json")
 
 # One-time backup of the original source
 backup = p_in.with_suffix(".json.bak")
@@ -18,7 +18,7 @@ with open(p_in, "r") as f:
 
 # Output file with today's date in the name
 today = date.today().isoformat()  # YYYY-MM-DD
-p_out = Path(f"daily_dials_{today}.json")
+p_out = Path(f"CombinedJSONS_DCSCMLE_Runs_401624to402040.json")
 
 # Rewrite in compact [[a,b],...] style to dated file
 with open(p_out, "w") as f:

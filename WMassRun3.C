@@ -607,25 +607,25 @@ void WMassRun3::Loop()
             jetVetoMap = "jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";
 
             if (runEra == "C") {
-               outputFile = "closure/Muon_Run2024C_ReReco_V10M_e6.root";
+               outputFile = "closure/Muon_Run2024C_ReReco_V10M_Golden_e6.root";
             }
             else if (runEra == "D") {
-               outputFile = "closure/Muon_Run2024D_ReReco_V10M_e6.root";
+               outputFile = "closure/Muon_Run2024D_ReReco_V10M_Golden_e6.root";
             }
             else if (runEra == "E") {
-               outputFile = "closure/Muon_Run2024E_ReReco_V10M_e6.root";
+               outputFile = "closure/Muon_Run2024E_ReReco_V10M_Golden_e6.root";
             }
             else if (runEra == "F") {
-               outputFile = "closure/Muon_Run2024F_Prompt_V10M_e6.root";
+               outputFile = "closure/Muon_Run2024F_Prompt_V10M_Golden_e6.root";
             }
             else if (runEra == "G") {
-               outputFile = "closure/Muon_Run2024G_Prompt_V10M_e6.root";
+               outputFile = "closure/Muon_Run2024G_Prompt_V10M_Golden_e6.root";
             }
             else if (runEra == "H") {
-               outputFile = "closure/Muon_Run2024H_Prompt_V10M_e6.root";
+               outputFile = "closure/Muon_Run2024H_Prompt_V10M_Golden_e6.root";
             }
             else if (runEra == "I") {
-               outputFile = "closure/Muon_Run2024I_Prompt_V10M_e6.root";
+               outputFile = "closure/Muon_Run2024I_Prompt_V10M_Golden_e6.root";
             }
             else {
                std::cerr << "Unsupported 2024 runEra: " << runEra << std::endl;
@@ -638,23 +638,23 @@ void WMassRun3::Loop()
 
             if (runEra == "C") {
                jecDataSet = "ClosureTest/Prompt25_DATA/Prompt25_Run2025C_V4M_DATA_L2L3Residual_AK4PFPuppi";
-               outputFile = "closure/Muon_Run2025C_Prompt_V4M_e6.root";
+               outputFile = "closure/Muon_Run2025C_Prompt_V4M_Golden_e6.root";
             }
             else if (runEra == "D") {
                jecDataSet = "ClosureTest/Prompt25_DATA/Prompt25_Run2025D_V4M_DATA_L2L3Residual_AK4PFPuppi";
-               outputFile = "closure/Muon_Run2025D_Prompt_V4M_e6.root";
+               outputFile = "closure/Muon_Run2025D_Prompt_V4M_Golden_e6.root";
             }
             else if (runEra == "E") {
                jecDataSet = "ClosureTest/Prompt25_DATA/Prompt25_Run2025E_V4M_DATA_L2L3Residual_AK4PFPuppi";
-               outputFile = "closure/Muon_Run2025E_Prompt_V4M_e6.root";
+               outputFile = "closure/Muon_Run2025E_Prompt_V4M_Golden_e6.root";
             }
             else if (runEra == "F") {
                jecDataSet = "ClosureTest/Prompt25_DATA/Prompt25_Run2025F_V4M_DATA_L2L3Residual_AK4PFPuppi";
-               outputFile = "closure/Muon_Run2025F_Prompt_V4M_e6.root";
+               outputFile = "closure/Muon_Run2025F_Prompt_V4M_Golden_e6.root";
             }
             else if (runEra == "G") {
                jecDataSet = "ClosureTest/Prompt25_DATA/Prompt25_Run2025G_V4M_DATA_L2L3Residual_AK4PFPuppi";
-               outputFile = "closure/Muon_Run2025G_Prompt_V4M_e6.root";
+               outputFile = "closure/Muon_Run2025G_Prompt_V4M_Golden_e6.root";
             }
             else {
                std::cerr << "Unsupported 2025 runEra: " << runEra << std::endl;

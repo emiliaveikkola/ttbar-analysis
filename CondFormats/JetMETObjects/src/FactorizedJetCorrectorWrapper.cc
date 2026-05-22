@@ -29,7 +29,7 @@ std::string trim(const std::string &s) {
 void FactorizedJetCorrectorWrapper::addJECset(std::string id, int verbosity) {
 
   // Base directory with JEC text files and fibs.txt
-  TString baseDir("CondFormats/JetMETObjects/data/");
+  TString baseDir("CondFormats/JetMETObjects/data/ClosureTest/");
 
   // Build a list of directories to scan.
   std::vector<TString> dirsToScan;

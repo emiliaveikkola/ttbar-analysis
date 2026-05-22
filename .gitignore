@@ -11,4 +11,8 @@ rootfiles/
 ignore/
 *.root
 CMSSW_16_0_6/
-
+log_*
+*.pdf
+*.bak
+*ACLiC*
+test*

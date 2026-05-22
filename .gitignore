@@ -10,4 +10,5 @@
 rootfiles/
 ignore/
 *.root
+CMSSW_16_0_6/
 

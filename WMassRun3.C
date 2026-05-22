@@ -13,6 +13,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <chrono>
 #include <ctime>
 #include <vector>
@@ -22,11 +23,16 @@
 #include <TLegend.h>
 #include <TColor.h>
 #include <TStopwatch.h>
+#include <TChainElement.h>
+#include <TChain.h>
 #include "tdrstyle_mod22.C"
 #include <set>
 #include <unordered_map>
 #include <cstdint>
 #include "THnSparse.h"
+#include <stdexcept>
+#include <string>
+
 
 // --- JetMETObjects (standalone JEC/JER) ---
 #include "CondFormats/JetMETObjects/interface/JetCorrectorParameters.h"
@@ -248,6 +254,186 @@ static inline double deltaR(double eta1, double phi1, double eta2, double phi2) 
 
 std::map<UInt_t, Long64_t> runCountAfterSplit;
 
+static std::string trim_copy(const std::string &s) {
+   auto start = s.begin();
+   while (start != s.end() && std::isspace(static_cast<unsigned char>(*start))) ++start;
+   auto end = s.end();
+   while (end != start && std::isspace(static_cast<unsigned char>(*(end - 1)))) --end;
+   return std::string(start, end);
+}
+
+static std::string Find2024NibOutputFileFromFibs(const std::string& runEra,
+                                                 const std::string& jecDataSet,
+                                                 int verbosity = 0) {
+   std::vector<std::string> fibCandidates;
+   fibCandidates.push_back("CondFormats/JetMETObjects/data/" + jecDataSet + "/fibs.txt");
+   fibCandidates.push_back("CondFormats/JetMETObjects/data/fibs.txt");
+
+   std::ifstream ifs;
+   std::string fibsFileUsed;
+   for (const auto& cand : fibCandidates) {
+      ifs.open(cand);
+      if (ifs.is_open()) {
+         fibsFileUsed = cand;
+         break;
+      }
+      ifs.clear();
+   }
+
+   if (!ifs.is_open()) {
+      std::cerr << "Could not open fibs.txt for 2024 nib output lookup" << std::endl;
+      return "";
+   }
+
+   if (verbosity > 0)
+      std::cout << "Using fibs file for output lookup: " << fibsFileUsed << std::endl;
+
+   std::string line;
+   std::getline(ifs, line); // skip header
+
+   while (std::getline(ifs, line)) {
+      if (line.empty()) continue;
+
+      std::istringstream iss(line);
+      std::string runRangeStr, nameStr;
+      if (!std::getline(iss, runRangeStr, '|')) continue;
+      if (!std::getline(iss, nameStr, '|')) continue;
+
+      nameStr = trim_copy(nameStr);
+      if (nameStr.rfind("2024", 0) != 0) continue;
+
+      std::istringstream nss(nameStr);
+      std::string eraToken, nibToken, fibToken;
+      if (!std::getline(nss, eraToken, '-')) continue;   // e.g. 2024F or 2024Ev1
+      if (!std::getline(nss, nibToken, '-')) continue;   // e.g. nib2
+      if (!std::getline(nss, fibToken, '-')) continue;   // e.g. fib10
+
+      const std::string eraShort = eraToken.substr(4);   // e.g. F or Ev1
+      const std::string compactKey = eraShort + nibToken; // e.g. Fnib2
+      const std::string underscoredKey = eraShort + "_" + nibToken; // e.g. F_nib2
+
+      if (runEra != compactKey && runEra != underscoredKey) continue;
+
+      const bool isReReco = (!eraShort.empty() && (eraShort[0] == 'C' || eraShort[0] == 'D' || eraShort[0] == 'E'));
+      const std::string recoLabel = isReReco ? "ReReco_V9M" : "Prompt_V9M";
+      return "Muon_Run" + eraToken + "_" + nibToken + "_" + recoLabel + ".root";
+   }
+
+   return "";
+}
+
+static std::vector<std::pair<UInt_t, UInt_t>> FindNibRunRangesFromFibs(int runYear,
+                                                                        const std::string& runEra,
+                                                                        const std::string& jecDataSet,
+                                                                        int verbosity = 0) {
+   std::vector<std::pair<UInt_t, UInt_t>> ranges;
+
+   std::vector<std::string> fibCandidates;
+   fibCandidates.push_back("CondFormats/JetMETObjects/data/" + jecDataSet + "/fibs.txt");
+   fibCandidates.push_back("CondFormats/JetMETObjects/data/fibs.txt");
+
+   std::ifstream ifs;
+   std::string fibsFileUsed;
+   for (const auto& cand : fibCandidates) {
+      ifs.open(cand);
+      if (ifs.is_open()) {
+         fibsFileUsed = cand;
+         break;
+      }
+      ifs.clear();
+   }
+
+   if (!ifs.is_open()) {
+      std::cerr << "Could not open fibs.txt for nib run-range lookup" << std::endl;
+      return ranges;
+   }
+
+   if (verbosity > 0)
+      std::cout << "Using fibs file for nib run-range lookup: " << fibsFileUsed << std::endl;
+
+   const std::string yearPrefix = std::to_string(runYear);
+
+   std::string line;
+   std::getline(ifs, line); // skip header
+   while (std::getline(ifs, line)) {
+      if (line.empty()) continue;
+
+      std::istringstream iss(line);
+      std::string runRangeStr, nameStr;
+      if (!std::getline(iss, runRangeStr, '|')) continue;
+      if (!std::getline(iss, nameStr, '|')) continue;
+
+      runRangeStr = trim_copy(runRangeStr);
+      nameStr = trim_copy(nameStr);
+      if (nameStr.rfind(yearPrefix, 0) != 0) continue;
+
+      std::istringstream nss(nameStr);
+      std::string eraToken, nibToken, fibToken;
+      if (!std::getline(nss, eraToken, '-')) continue;
+      if (!std::getline(nss, nibToken, '-')) continue;
+      if (!std::getline(nss, fibToken, '-')) continue;
+
+      const std::string eraShort = eraToken.substr(yearPrefix.size());
+      const std::string compactKey = eraShort + nibToken;            // e.g. Fnib2
+      const std::string underscoredKey = eraShort + "_" + nibToken; // e.g. F_nib2
+
+      if (runEra != compactKey && runEra != underscoredKey) continue;
+
+      if (!runRangeStr.empty() && runRangeStr.front() == '[' && runRangeStr.back() == ']')
+         runRangeStr = runRangeStr.substr(1, runRangeStr.size() - 2);
+
+      std::istringstream riss(runRangeStr);
+      std::string runMinStr, runMaxStr;
+      if (!std::getline(riss, runMinStr, ',')) continue;
+      if (!std::getline(riss, runMaxStr)) continue;
+
+      const UInt_t thisMin = static_cast<UInt_t>(std::stoul(trim_copy(runMinStr)));
+      const UInt_t thisMax = static_cast<UInt_t>(std::stoul(trim_copy(runMaxStr)));
+      ranges.emplace_back(thisMin, thisMax);
+   }
+
+   std::sort(ranges.begin(), ranges.end(),
+             [](const std::pair<UInt_t, UInt_t>& a, const std::pair<UInt_t, UInt_t>& b) {
+                if (a.first != b.first) return a.first < b.first;
+                return a.second < b.second;
+             });
+
+   return ranges;
+}
+
+
+double ReadNamedDouble(const std::string& fileName, const std::string& keyToFind) {
+   std::ifstream fin(fileName);
+   if (!fin.is_open()) {
+      throw std::runtime_error("Could not open normalization file: " + fileName);
+   }
+
+   std::string line;
+   while (std::getline(fin, line)) {
+      line = trim_copy(line);
+      if (line.empty() || line[0] == '#') continue;
+
+      std::istringstream iss(line);
+      std::string key;
+      double value = 0.0;
+      if (!(iss >> key >> value)) continue;
+      if (key == keyToFind) return value;
+   }
+
+   throw std::runtime_error("Could not find key '" + keyToFind + "' in file: " + fileName);
+}
+
+double ReadLumiFb(const std::string& lumiFile) {
+   return ReadNamedDouble(lumiFile, "targetLumiFb");
+}
+
+std::string BuildMCNormFile(const std::string& sampleName, const std::string& normTag) {
+   std::ostringstream fileName;
+   fileName << "input_files/mc_norm_" << sampleName << "_" << normTag << ".txt";
+   return fileName.str();
+}
+
+
 void WMassRun3::Loop()
 {
 //   In a ROOT session, you can do:
@@ -351,14 +537,17 @@ void WMassRun3::Loop()
    //fout = new TFile("Muon_Run2024FGHI_ReReco.root", "RECREATE");
    //fout = new TFile("Summer24_TTtoLNu2Q.root", "RECREATE");
    // Year-based configuration
+   bool isClosureTest = true;
    static const int runYear = 2026; // set to 2024 or 2025
-   static const std::string runEra = "B"; // for 2025: "A", "B", etc.
+   static const std::string runEra = "D"; // for 2025: "A", "B", etc.
    std::string jsonFile, jecMCSet, jecDataSet, outputFile, jetVetoMap, JERSFvsPt, JERres;
+   std::string mcNormTag; // input_files/mc_norm_TTtoLNu2Q_<tag>.txt
 
    bool TopPtDependentMass = false;
    bool isMC = false;
    // JER smearing (JER SF)
    bool smearJets = false;
+   static const std::string JERSF = "2026C";
    
    bool useJERSFvsPt = false; // new file format
    int smearNMax = 3;
@@ -369,8 +558,137 @@ void WMassRun3::Loop()
 		_mersennetwister = std::mt19937(_seed);
    }
 
+   // Baseline MC event-weight switch:
+   //   0 -> nominal MC: genWeight * mcNorm / sumGenWeight
+   //   1 -> FSR 0.5: genWeight * PSWeight[idx_fsr_0p5]  * mcNorm / sumGenWeightPS[idx_fsr_0p5]
+   //   2 -> FSR 2.0: genWeight * PSWeight[idx_fsr_2p0]  * mcNorm / sumGenWeightPS[idx_fsr_2p0]
+   //   3 -> FSR 0.25: genWeight * PSWeight[idx_fsr_0p25] * mcNorm / sumGenWeightPS[idx_fsr_0p25]
+   static const int nominalPSMode = 0;
+
    string jerpath(""), jerpathsf("");
 
+
+
+   if (isClosureTest) {
+      if (isMC && runYear == 2024) {
+         jecMCSet   = "RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI";
+         jetVetoMap = "jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";
+         JERres     = "Summer23BPixPrompt23_RunD_JRV1_MC_PtResolution_AK4PFPuppi.txt";
+
+         if (JERSF == "2024") {
+            JERSFvsPt  = "ClosureTest/Prompt24_MC_SF/Prompt24_2024_nib_JRV10M_MC_SF_AK4PFPuppi";
+            mcNormTag  = "2024";
+            outputFile = "closure/Summer24_TTtoLNu2Q_JMENano_V10M_JER2024nib_e6.root";
+         }
+         else if (JERSF == "2025") {
+            JERSFvsPt  = "ClosureTest/Prompt25_MC_SF/Prompt25_2025CDEFG_JRV4M_MC_SF_AK4PFPuppi";
+            mcNormTag  = "2025";
+            outputFile = "closure/Summer24_TTtoLNu2Q_JMENano_V4M_JER2025CDEFG_e6.root";
+         }
+         else if (JERSF == "2026BD") {
+            JERSFvsPt  = "ClosureTest/Prompt26_MC_SF/Prompt26_2026B_JRV1M_MC_SF_AK4PFPuppi";
+            mcNormTag  = "2026";
+            outputFile = "closure/Summer24_TTtoLNu2Q_JMENano_V1M_JER2026BD_e6.root";
+         }
+         else if (JERSF == "2026C") {
+            JERSFvsPt  = "ClosureTest/Prompt26_MC_SF/Prompt26_2026C_JRV1M_MC_SF_AK4PFPuppi";
+            mcNormTag  = "2026";
+            outputFile = "closure/Summer24_TTtoLNu2Q_JMENano_V1M_JER2026C_e6.root";
+         }
+         else {
+            std::cerr << "Unsupported JERSF option: " << JERSF << std::endl;
+            return;
+         }
+      } else {
+         if (runYear == 2024) {
+            jsonFile   = "Cert_Collisions2024_378981_386951_Golden.json";
+            jecMCSet   = "RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI";
+            jecDataSet = "Prompt24_V10M_DATA";
+            jetVetoMap = "jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";
+
+            if (runEra == "C") {
+               outputFile = "closure/Muon_Run2024C_ReReco_V10M_e6.root";
+            }
+            else if (runEra == "D") {
+               outputFile = "closure/Muon_Run2024D_ReReco_V10M_e6.root";
+            }
+            else if (runEra == "E") {
+               outputFile = "closure/Muon_Run2024E_ReReco_V10M_e6.root";
+            }
+            else if (runEra == "F") {
+               outputFile = "closure/Muon_Run2024F_Prompt_V10M_e6.root";
+            }
+            else if (runEra == "G") {
+               outputFile = "closure/Muon_Run2024G_Prompt_V10M_e6.root";
+            }
+            else if (runEra == "H") {
+               outputFile = "closure/Muon_Run2024H_Prompt_V10M_e6.root";
+            }
+            else if (runEra == "I") {
+               outputFile = "closure/Muon_Run2024I_Prompt_V10M_e6.root";
+            }
+            else {
+               std::cerr << "Unsupported 2024 runEra: " << runEra << std::endl;
+               return;
+            }
+         } else if (runYear == 2025) {
+            jsonFile   = "Cert_Collisions2025_391658_398903_Golden.json";
+            jecMCSet   = "Winter25Run3_V1_MC_L2Relative_AK4PUPPI";
+            jetVetoMap = "jet_veto_maps/jetveto2025CDEFG_V3M.root";
+
+            if (runEra == "C") {
+               jecDataSet = "ClosureTest/Prompt25_DATA/Prompt25_Run2025C_V4M_DATA_L2L3Residual_AK4PFPuppi";
+               outputFile = "closure/Muon_Run2025C_Prompt_V4M_e6.root";
+            }
+            else if (runEra == "D") {
+               jecDataSet = "ClosureTest/Prompt25_DATA/Prompt25_Run2025D_V4M_DATA_L2L3Residual_AK4PFPuppi";
+               outputFile = "closure/Muon_Run2025D_Prompt_V4M_e6.root";
+            }
+            else if (runEra == "E") {
+               jecDataSet = "ClosureTest/Prompt25_DATA/Prompt25_Run2025E_V4M_DATA_L2L3Residual_AK4PFPuppi";
+               outputFile = "closure/Muon_Run2025E_Prompt_V4M_e6.root";
+            }
+            else if (runEra == "F") {
+               jecDataSet = "ClosureTest/Prompt25_DATA/Prompt25_Run2025F_V4M_DATA_L2L3Residual_AK4PFPuppi";
+               outputFile = "closure/Muon_Run2025F_Prompt_V4M_e6.root";
+            }
+            else if (runEra == "G") {
+               jecDataSet = "ClosureTest/Prompt25_DATA/Prompt25_Run2025G_V4M_DATA_L2L3Residual_AK4PFPuppi";
+               outputFile = "closure/Muon_Run2025G_Prompt_V4M_e6.root";
+            }
+            else {
+               std::cerr << "Unsupported 2025 runEra: " << runEra << std::endl;
+               return;
+            }
+         } else if (runYear == 2026) {
+            jsonFile   = "Collisions26_MLEnhancedGolden_Latest.json"; // 21.5.
+            jecMCSet   = "Run3Winter26_PhiDependent_L2Relative_AK4PUPPI";
+            jetVetoMap = "jet_veto_maps/jetveto2026B_V0M.root";
+
+            if (runEra == "B") {
+               jecDataSet = "ClosureTest/Prompt26_DATA/Prompt26_Run2026B_V1M_DATA_L2L3Residual_AK4PFPuppi";
+               outputFile = "closure/Muon_Run2026B_Prompt_V1M_MLEnhancedGolden_Latest21.5._e6.root";
+            }
+            else if (runEra == "C") {
+               jecDataSet = "ClosureTest/Prompt26_DATA/Prompt26_Run2026C_V1M_DATA_L2L3Residual_AK4PFPuppi";
+               outputFile = "closure/Muon_Run2026C_Prompt_V1M_MLEnhancedGolden_Latest21.5._e6.root";
+            }
+            else if (runEra == "D") {
+               jecDataSet = "ClosureTest/Prompt26_DATA/Prompt26_Run2026D_V1M_DATA_L2L3Residual_AK4PFPuppi";
+               outputFile = "closure/Muon_Run2026D_Prompt_V1M_MLEnhancedGolden_Latest21.5._e6.root";
+            }
+            else {
+               std::cerr << "Unsupported 2026 runEra: " << runEra << std::endl;
+               return;
+            }
+         } else {
+            std::cerr << "Unsupported runYear: " << runYear << std::endl;
+            return;
+         }
+      }
+   }
+
+if (!isClosureTest){
    if (isMC && (runYear == 2024)) {
       if (TopPtDependentMass) {
          jecMCSet   = "RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI"; //Winter24Run3_V1_MC_L2Relative_AK4PUPPI //RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI
@@ -383,10 +701,13 @@ void WMassRun3::Loop()
       } else {
          jecMCSet   = "RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI"; //Winter24Run3_V1_MC_L2Relative_AK4PUPPI //RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI
          jetVetoMap = "jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root"; //jet_veto_maps/Winter24Prompt24/Winter24Prompt24_2024BCDEFGHI.root //jetvetoReReco2024_V9M.root
-         JERSFvsPt = "ReReco24_V10M_MC/ReReco24_2024_nib_JRV10M_MC_SF_AK4PFPuppi"; //"ReReco24_2024_nib_JRV10M_MC_SF_AK4PFPuppi";
+         JERSFvsPt = "ReReco24_V10M_MC/ReReco24_2024_nib_JRV10M_MC_SF_AK4PFPuppi";//"Prompt26_V0M_MC/Prompt26_2026B_JRV0M_MC_SF_AK4PFPuppi";//"Prompt25_V3M_MC/Prompt25_2025CDEFG_JRV3M_MC_SF_AK4PFPuppi";//"ReReco24_V10M_MC/ReReco24_2024_nib_JRV10M_MC_SF_AK4PFPuppi"; //"ReReco24_2024_nib_JRV10M_MC_SF_AK4PFPuppi";
+         // Independent tag for input_files/mc_norm_TTtoLNu2Q_<tag>.txt.
+         // This controls only the MC xsec*lumi normalization file.
+         mcNormTag = "2024";
          // JER resolution (Pt Resolution txt)
          JERres   = "Summer23BPixPrompt23_RunD_JRV1_MC_PtResolution_AK4PFPuppi.txt";              
-         outputFile = "Summer24_TTtoLNu2Q_V9M_FSR.root";
+         outputFile = "Summer24_TTtoLNu2Q_JMENano_V9M_noJER_FSR025.root";
       }
    }
    else if (isMC && (runYear == 2025)) {
@@ -395,6 +716,7 @@ void WMassRun3::Loop()
          jetVetoMap = "jet_veto_maps/jetveto2025CDEFG_V3M.root"; //jet_veto_maps/Winter24Prompt24/Winter24Prompt24_2024BCDEFGHI.root //jetvetoReReco2024_V9M.root
          // JER Scale Factors (pt-dependent via FactorizedJetCorrector)
          JERSFvsPt = "Prompt25_V2M_MC/Prompt25_2025CDE_JRV2M_MC_SF_AK4PFPuppi"; //"ReReco24_2024_nib_JRV10M_MC_SF_AK4PFPuppi";
+         mcNormTag = "2025";
          // JER resolution (Pt Resolution txt)
          JERres   = "Summer23BPixPrompt23_RunD_JRV1_MC_PtResolution_AK4PFPuppi.txt";              
          outputFile = "Winter25_TTtoLNu2Q_TopPtDependentMass.root";
@@ -402,10 +724,11 @@ void WMassRun3::Loop()
          jecMCSet   = "Winter25Run3_V1_MC_L2Relative_AK4PUPPI"; //Winter24Run3_V1_MC_L2Relative_AK4PUPPI //RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI
          jetVetoMap = "jet_veto_maps/jetveto2025CDEFG_V3M.root"; //jet_veto_maps/Winter24Prompt24/Winter24Prompt24_2024BCDEFGHI.root //jetvetoReReco2024_V9M.root
          // JER Scale Factors (pt-dependent via FactorizedJetCorrector)
-         JERSFvsPt = "Prompt25_V3M_MC/Prompt25_2025CDEFG_JRV3M_MC_SF_AK4PFPuppi.txt"; //"ReReco24_2024_nib_JRV10M_MC_SF_AK4PFPuppi";
+         JERSFvsPt = "Prompt25_V3M_MC/Prompt25_2025CDEFG_JRV3M_MC_SF_AK4PFPuppi"; //"ReReco24_2024_nib_JRV10M_MC_SF_AK4PFPuppi";
+         mcNormTag = "2025";
          // JER resolution (Pt Resolution txt)
          JERres   = "Summer23BPixPrompt23_RunD_JRV1_MC_PtResolution_AK4PFPuppi.txt";
-         outputFile = "Winter25_TTtoLNu2Q_V3M.root"; //"Winter25_TTtoLNu2Q.root";
+         outputFile = "Winter25_TTtoLNu2Q_V3M_25V3MCSF.root"; //"Winter25_TTtoLNu2Q.root";
       }
    }
    else if (runYear == 2024) {
@@ -414,78 +737,81 @@ void WMassRun3::Loop()
        jecDataSet = "ReReco24_V9M_DATA"; //Reprocessing24_V8M_DATA //Prompt24_V8M_DATA //ReReco24_V9M_DATA
        jetVetoMap = "jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root"; //jet_veto_maps/Winter24Prompt24/Winter24Prompt24_2024BCDEFGHI.root //jetvetoReReco2024_V9M.root
        if (runEra == "CDE") {
-         outputFile = "Muon_Run2024CDE_ReReco_V9M.root";
+         outputFile = "Muon_Run2024CDE_ReProcessing_ReReco_V9M_lumi.root";
        } else if (runEra == "FGHI"){
-         outputFile = "Muon_Run2024FGHI_Prompt_V9M.root";
-       }
+         outputFile = "Muon_Run2024FGHI_Prompt_V9M_lumi.root";
+       } else if (runEra == "C") outputFile = "Muon_Run2024C_ReReco_V9M.root";
+         else if (runEra == "D") outputFile = "Muon_Run2024D_ReReco_V9M.root";
+         else if (runEra == "E") outputFile = "Muon_Run2024E_ReReco_V9M.root";
+         else if (runEra == "F") outputFile = "Muon_Run2024F_Prompt_V9M.root";
+         else if (runEra == "G") outputFile = "Muon_Run2024G_Prompt_V9M.root";
+         else if (runEra == "H") outputFile = "Muon_Run2024H_Prompt_V9M.root";
+         else if (runEra == "I") outputFile = "Muon_Run2024I_Prompt_V9M.root";
+         else if (runEra == "CDEFGHI") outputFile = "Muon_Run2024CDEFGHI_ReReco_V9M.root";
+         else if (runEra.find("nib") != std::string::npos) {
+            outputFile = Find2024NibOutputFileFromFibs(runEra, jecDataSet, 1);
+            if (outputFile.empty()) {
+               std::cerr << "Unsupported 2024 nib-era for output-file generation: " << runEra << std::endl;
+               return;
+            }
+         }
    } else if (runYear == 2025) {
+         jsonFile   = "Cert_Collisions2025_391658_398903_Golden.json"; //"Cert_Collisions2025_391658_398860_Golden.json"; //"Cert_Collisions2025D_daily_dials_12-08-2025.json"; //"Collisions25_13p6TeV_391658_395372_DCSOnly_TkPx.json";
+         jecMCSet   = "Winter25Run3_V1_MC_L2Relative_AK4PUPPI";
+         jetVetoMap = "jet_veto_maps/jetveto2025CDEFG_V3M.root"; //"jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               
        if (runEra == "C") {
-           jsonFile   = "Cert_Collisions2025_391658_398860_Golden.json";
-           jecMCSet   = "Winter25Run3_V1_MC_L2Relative_AK4PUPPI";
            jecDataSet = "Prompt25_V3M_DATA/Prompt25_Run2025C_V3M_DATA_L2L3Residual_AK4PFPuppi"; //"Prompt25_V1M_DATA";
-           jetVetoMap = "jet_veto_maps/jetveto2025CDEFG_V3M.root"; //"jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               
-           outputFile = "Muon_Run2025C_Prompt_V3M_test.root";
-       } else if (runEra == "C_TrkRadDamage") {
-           jsonFile   = "Cert_Collisions2025_391658_398860_Golden.json";
-           jecMCSet   = "Winter25Run3_V1_MC_L2Relative_AK4PUPPI";
-           jecDataSet = "Prompt25_V3M_DATA/Prompt25_Run2025C_V3M_DATA_L2L3Residual_AK4PFPuppi"; //"Prompt25_V1M_DATA";
-           jetVetoMap = "jet_veto_maps/jetveto2025CDEFG_V3M.root"; //"jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               
-           outputFile = "Muon_Run2025C_TrkRadDamage_Prompt_V3M.root";
+           outputFile = "Muon_Run2025C_Prompt_V3M.root";
        } else if (runEra == "D") {
-           jsonFile   = "Cert_Collisions2025_391658_398860_Golden.json"; //"Cert_Collisions2025D_daily_dials_12-08-2025.json"; //"Collisions25_13p6TeV_391658_395372_DCSOnly_TkPx.json";
-           jecMCSet   = "Winter25Run3_V1_MC_L2Relative_AK4PUPPI";
-           jecDataSet = "Prompt25_V3M_DATA/Prompt25_Run2025D_V3M_DATA_L2L3Residual_AK4PFPuppi"; //"Prompt25_V1M_DATA";
-           jetVetoMap = "jet_veto_maps/jetveto2025CDEFG_V3M.root"; //"jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               
+           jecDataSet = "Prompt25_V3M_DATA/Prompt25_Run2025D_V3M_DATA_L2L3Residual_AK4PFPuppi"; //"Prompt25_V1M_DATA";               
            outputFile = "Muon_Run2025D_Prompt_V3M.root";
        } else if (runEra == "E") {
-           jsonFile   = "Cert_Collisions2025_391658_398860_Golden.json"; //"Cert_Collisions2025D_daily_dials_12-08-2025.json"; //"Collisions25_13p6TeV_391658_395372_DCSOnly_TkPx.json";
-           jecMCSet   = "Winter25Run3_V1_MC_L2Relative_AK4PUPPI";
            jecDataSet = "Prompt25_V3M_DATA/Prompt25_Run2025E_V3M_DATA_L2L3Residual_AK4PFPuppi"; //"Prompt25_V1M_DATA";
-           jetVetoMap = "jet_veto_maps/jetveto2025CDEFG_V3M.root"; //"jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               
            outputFile = "Muon_Run2025E_Prompt_V3M.root";
        } else if (runEra == "F") {
-           jsonFile   = "Cert_Collisions2025_391658_398860_Golden.json"; //"Cert_Collisions2025D_daily_dials_12-08-2025.json"; //"Collisions25_13p6TeV_391658_395372_DCSOnly_TkPx.json";
-           jecMCSet   = "Winter25Run3_V1_MC_L2Relative_AK4PUPPI";
            jecDataSet = "Prompt25_V3M_DATA/Prompt25_Run2025F_V3M_DATA_L2L3Residual_AK4PFPuppi"; //"Prompt25_V1M_DATA";
-           jetVetoMap = "jet_veto_maps/jetveto2025CDEFG_V3M.root"; //"jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               
-           outputFile = "Muon_Run2025F_Prompt_V3M_test.root";
+           outputFile = "Muon_Run2025F_Prompt_V3M.root";
       } else if (runEra == "G") {
-           jsonFile   = "Cert_Collisions2025_391658_398860_Golden.json"; //"Cert_Collisions2025D_daily_dials_12-08-2025.json"; //"Collisions25_13p6TeV_391658_395372_DCSOnly_TkPx.json";
-           jecMCSet   = "Winter25Run3_V1_MC_L2Relative_AK4PUPPI";
            jecDataSet = "Prompt25_V3M_DATA/Prompt25_Run2025G_V3M_DATA_L2L3Residual_AK4PFPuppi"; //"Prompt25_V1M_DATA";
-           jetVetoMap = "jet_veto_maps/jetveto2025CDEFG_V3M.root"; //"jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               
-           outputFile = "Muon_Run2025G_Prompt_V3M.root";
+           outputFile = "Muon_Run2025G_Prompt_V3M_no398803.root";
       } else if (runEra == "CDEFG") {
-           jsonFile   = "Cert_Collisions2025_391658_398860_Golden.json"; //"Cert_Collisions2025D_daily_dials_12-08-2025.json"; //"Collisions25_13p6TeV_391658_395372_DCSOnly_TkPx.json";
-           jecMCSet   = "Winter25Run3_V1_MC_L2Relative_AK4PUPPI";
            jecDataSet = "Prompt25_V3M_DATA/Prompt25_Run2025CDEFG_V3M_DATA_L2L3Residual_AK4PFPuppi"; //"Prompt25_V1M_DATA";
-           jetVetoMap = "jet_veto_maps/jetveto2025CDEFG_V3M.root"; //"jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";               
-           outputFile = "Muon_Run2025CDEFG_Prompt_V3M.root";     
+           outputFile = "Muon_Run2025CDEFG_Prompt_V3M_no398803.root";     
        } else {
            std::cerr << "Unsupported runEra: " << runEra << std::endl;
            return;
        }
    } else if (runYear == 2026) {
-         jsonFile   = "CombinedJSONS_DCSCMLE_Runs_401624to402040.json";//"Collisions26_13p6TeV_401623_401961_DCSOnly_TkPx.json"; //"Cert_Collisions2025D_daily_dials_12-08-2025.json"; //"Collisions25_13p6TeV_391658_395372_DCSOnly_TkPx.json";
-         //jecDataSet = "Prompt25_V3M_DATA/Prompt25_Run2025G_V3M_DATA_L2L3Residual_AK4PFPuppi"; //"Prompt25_V1M_DATA";
-         jetVetoMap = "jet_veto_maps/jetveto2025CDEFG_V3M.root"; //"jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";
+         //jsonFile   = "CombinedJSONS_MLMRuns_401630to402604_DCSRuns_402605to402655.json";//e3 //"CombinedJSONS_MLJSONRuns_401630to402172_DCSRuns_402173to402244.json";//e2//"CombinedJSONS_DCSCMLE_Runs_401624to402040.json";//"Collisions26_13p6TeV_401623_401961_DCSOnly_TkPx.json"; //"Cert_Collisions2025D_daily_dials_12-08-2025.json"; //"Collisions25_13p6TeV_391658_395372_DCSOnly_TkPx.json";
+         jecDataSet = "Prompt26_V0M_DATA/Prompt26_Run2026B_V0M_DATA_L2L3Residual_AK4PFPuppi"; //"Prompt25_V3M_DATA/Prompt25_Run2025G_V3M_DATA_L2L3Residual_AK4PFPuppi"; //"Prompt25_V1M_DATA";
+         jetVetoMap = "jet_veto_maps/jetveto2026B_V0M.root";//"jet_veto_maps/jetveto2025CDEFG_V3M.root"; //"jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";
          if (runEra == "A") {
          jecMCSet   = "Winter25Run3_V1_MC_L2Relative_AK4PUPPI";
          outputFile = "Muon_Run2026A_Prompt_L2L32025G.root";
       } else if (runEra == "Bnib1") {
          jecMCSet   = "Run3Winter26_PhiDependent_L2Relative_AK4PUPPI";
-         outputFile = "Muon_Run2026Bnib1_Prompt_CombinedJSON_e1.root";
+         outputFile = "Muon_Run2026Bnib1_Prompt_V0M_CombinedJSON_e2.root";
       } else if (runEra == "Bnib2") {
          jecMCSet   = "Run3Winter26_PhiDependent_L2Relative_AK4PUPPI";
-        outputFile = "Muon_Run2026Bnib2_Prompt_CombinedJSON_e1.root";               
+        outputFile = "Muon_Run2026Bnib2_Prompt_V0M_CombinedJSON_e2.root";               
       } else if (runEra == "B") {
+         jsonFile = "Cert_Collisions2026_401624_402537_golden.json"; //e4
          jecMCSet   = "Run3Winter26_PhiDependent_L2Relative_AK4PUPPI";
-        outputFile = "Muon_Run2026B_Prompt_CombinedJSON_e1.root";      
+        outputFile = "Muon_Run2026B_Prompt_V0M_GoldenJSON_e4.root";      
+      } else if (runEra == "C") {
+         jsonFile = "CombinedJSONS_MLEnhancedGoldenRuns_401630to402825_DCSRuns_402826to403008.json"; //e4
+         jecMCSet   = "Run3Winter26_PhiDependent_L2Relative_AK4PUPPI";
+        outputFile = "Muon_Run2026C_Prompt_V0M_CombinedJSON_e4.root";      
+      } else if (runEra == "D") {
+         jsonFile = "CombinedJSONS_GoldenRuns_MLEnhancedGolden_401630to403457_DCSRuns_403458to403493_.json"; //e5
+         jecMCSet   = "Run3Winter26_PhiDependent_L2Relative_AK4PUPPI";
+        outputFile = "Muon_Run2026D_Prompt_V0M_CombinedJSON_e5.root";      
       }
    } else {
        std::cerr << "Unsupported runYear: " << runYear << std::endl;
        return;
    }
+}
    fout = new TFile(outputFile.c_str(), "RECREATE");
    fout->cd();
    // Separate output for run vs BX map (filled once, no cuts)
@@ -530,7 +856,15 @@ void WMassRun3::Loop()
       fChain->SetBranchStatus("GenJet_partonFlavour", 1);
       fChain->SetBranchStatus("Rho_fixedGridRhoFastjetAll", 1);
 
-      // PS weights (w_var / w_nominal): [0] isr.murfac=2.0; [1] fsr.murfac=2.0; [2] isr.murfac=0.5; [3] fsr.murfac=0.5
+      // PSWeight layout depends on NanoAOD type:
+      //   regular NanoAOD / PromptNano: nPSWeight==4
+      //      [1] = fsr.murfac=2.0
+      //      [3] = fsr.murfac=0.5
+      //   JMENano: nPSWeight==44
+      //      [2] = fsr.murfac=0.5
+      //      [3] = fsr.murfac=2.0
+      //      [4] = fsr.murfac=0.25
+      // Use runtime checks below to avoid silent index bugs.
       fChain->SetBranchStatus("nPSWeight", 1);
       fChain->SetBranchStatus("PSWeight", 1);
       
@@ -751,7 +1085,9 @@ void WMassRun3::Loop()
       TProfile* p_genJetPt_vs_partonPt        = new TProfile("p_genJetPt_vs_partonPt",        ";parton p_{T} (GeV);#LT GenJet p_{T} #GT (GeV)",        nptd, vptd);
       TProfile* p_genJetPtOverPartonPt_vs_partonPt = new TProfile("p_genJetPtOverPartonPt_vs_partonPt", ";parton p_{T} (GeV);#LT GenJet p_{T} / parton p_{T} #GT", nptd, vptd);
 
-      // FSR up/down (PSWeight[1]/PSWeight[3]) versions for Gen/parton studies
+      // FSR up/down versions for Gen/parton studies
+      // JMENano: fsr=0.5 -> PSWeight[2], fsr=2.0 -> PSWeight[3]
+      // Prompt/regular NanoAOD: fsr=0.5 -> PSWeight[3], fsr=2.0 -> PSWeight[1]
       TProfile* p_partonPt_vs_partonPt_fsrUp        = new TProfile("p_partonPt_vs_partonPt_fsrUp",        ";parton p_{T} (GeV);#LT parton p_{T} #GT (GeV) [FSR Up]",        nptd, vptd);
       TProfile* p_partonPt_vs_partonPt_fsrDown      = new TProfile("p_partonPt_vs_partonPt_fsrDown",      ";parton p_{T} (GeV);#LT parton p_{T} #GT (GeV) [FSR Down]",      nptd, vptd);
       TProfile* p_genJetPt_vs_partonPt_fsrUp        = new TProfile("p_genJetPt_vs_partonPt_fsrUp",        ";parton p_{T} (GeV);#LT GenJet p_{T} #GT (GeV) [FSR Up]",        nptd, vptd);
@@ -864,17 +1200,44 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
    std::cout << std::ctime(&now) << std::endl<< flush;  
    cout << "Processing " << nentries << " events" << endl << flush;
    TStopwatch t;
+   std::vector<std::pair<UInt_t, UInt_t>> cached2024NibRanges;
+   if (!isMC && runYear == 2024 && runEra.find("nib") != std::string::npos) {
+      cached2024NibRanges = FindNibRunRangesFromFibs(2024, runEra, jecDataSet, 1);
+      if (cached2024NibRanges.empty()) {
+         std::cerr << "Could not determine 2024 nib run ranges from fibs.txt for runEra="
+                   << runEra << std::endl;
+         return;
+      }
+   }
    t.Start();
-   const int nlap = 1000;
+   const int nlap = 1000; // unused with compact [LOOP] progress print
    const int nlap2 = 80000;
-   //nentries = 100000;
+   //nentries = 1000000;
+
 
    auto passRunEraSelection = [&](UInt_t runNumber) {
-   if (isMC) return true;
-   if (runEra == "Bnib1") return (runNumber == 401844u || runNumber == 401848u);
-   if (runEra == "Bnib2") return (runNumber != 401844u && runNumber != 401848u);
-   return true;
-};
+      if (isMC) return true;
+
+      // 2024 nib-based selection from fibs.txt, keeping the exact fib run segments.
+      if (runYear == 2024 && runEra.find("nib") != std::string::npos) {
+         for (const auto& r : cached2024NibRanges) {
+            if (runNumber >= r.first && runNumber <= r.second)
+               return true;
+         }
+         return false;
+      }
+
+      // 2025: remove bad run if G is included in era string (G or CDEFG etc.)
+      if (runYear == 2025 && runEra.find("G") != std::string::npos) {
+         if (runNumber == 398803u) return false;
+      }
+      // 2026 nib-based selection stays hardcoded
+      if (runYear == 2026 && runEra == "Bnib1") return (runNumber == 401844u || runNumber == 401848u);
+      if (runYear == 2026 && runEra == "Bnib2") return (runNumber != 401844u && runNumber != 401848u);
+
+      return true;
+   };
+
 
    TLorentzVector p4jet, lhe, jet, jet2, jetn;
    TLorentzVector met, met1, metn, metu, metnu, rawmet, corrmet, rawgam;
@@ -908,13 +1271,13 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
       //source /cvmfs/cms-bril.cern.ch/cms-lumi-pog/brilws-docker/brilws-env
       //brilcalc lumi --byls --normtag /cvmfs/cms-bril.cern.ch/cms-lumi-pog/Normtags/normtag_BRIL.json --datatag online -i Collisions26_13p6TeV_Latest.json --hltpath HLT_IsoMu24_v*  -u /fb --minBiasXsec 75300 -o lumi_26_IsoMu24.csv
       std::string lumifile;
-      if (runYear == 2024)
-         lumifile = "lumi_378981_386951_IsoMu24.csv";
+      /*if (runYear == 2024)
+         lumifile = "lumi_24_IsoMu24.csv";
       else if (runYear == 2025)
-         lumifile = "lumi_391658_398860_Golden_IsoMu24.csv";
-      //else if (runYear == 2026)
-         //lumifile = "lumi_26_IsoMu24.csv";
-
+         lumifile = "lumi_25_IsoMu24.csv";
+      else if (runYear == 2026)
+         lumifile = "lumi_26_IsoMu24.csv";
+*/
       if (lumifile.empty()) {
          std::cout << "[LUMI][ERROR] lumifile is empty in data mode!" << std::endl;
       } else {
@@ -987,7 +1350,7 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
     TH2D *h2jv = 0;
     TH2D *bpixjv = 0;
     TH2D *fpixjv = 0;
-    h2jv = (TH2D*)fjv->Get("jetvetomap");
+    h2jv = (TH2D*)fjv->Get("jetvetomap_all");
     bpixjv = (TH2D*)fjv->Get("jetvetomap_bpix"); //loading the bpix vetomap for all '24 stuff
     fpixjv = (TH2D*)fjv->Get("jetvetomap_fpix"); //loading the fpix vetomap for all '24 stuff
     if (!h2jv) cout << "Jetvetomap histo not found" << endl << flush;
@@ -1030,21 +1393,316 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
       std::cout << "Missing JER files" << std::endl << std::flush;
    }
 
+
+   // ============================================================
+   // PSWeight configuration
+   // ============================================================
+   // Easy switch:
+   //   false -> use only genWeight
+   //   true  -> use genWeight * PSWeight[index]
+   const bool usePSWeightsForFSR = true;
+
+   // If true, require JMENano layout only (nPSWeight==44)
+   // If false, allow both JMENano (44) and regular NanoAOD / PromptNano (4)
+   const bool requireJMENanoForFSR025 = false;
+
+   bool psLayoutInitialized = false;
+   bool isJMENanoPS = false;
+   bool isPromptNanoPS = false;
+
+   int idx_fsr_2p0  = -1;
+   int idx_fsr_0p5  = -1;
+   int idx_fsr_0p25 = -1; // only available in JMENano
+
+   // Normalization sums for MC weights.
+   // Filled from the Runs tree before the real event loop.
+   // Runs.PSSumw is stored as:
+   //   PSSumw[idx] = sum(genWeight * PSWeight[idx]) / genEventSumw
+   // Therefore the global PS denominator is:
+   //   sumGenWeightPS[idx] = sum_over_runs(genEventSumw * PSSumw[idx])
+   // Nominal normalized event weight:
+   //   normalizedGenWeight = genWeight * mcNorm / sumGenWeight
+   // PS-normalized event weight:
+   //   genWeight * PSWeight[idx] * mcNorm / sumGenWeightPS[idx]
+   double sumGenWeight = 0.0;
+   std::vector<double> sumGenWeightPS;
+
+   // MC yield normalization:
+   //   mcNorm = xsec(pb) * target lumi(pb^-1)
+   // Values are kept in a text file so xsec/lumi updates do not require
+   // editing this macro. For TTtoLNu2Q, use the final analysis cross section
+   // in xsecPb, e.g. inclusive ttbar NNLO+NNLL * BR(ttbar -> LNu2Q), not the
+   // raw MiniAOD GenXSecAnalyzer number unless that is explicitly intended.
+   const std::string mcSampleName = "TTtoLNu2Q";
+   const std::string mcNormFile = BuildMCNormFile(mcSampleName, mcNormTag);
+   double ttToLNu2QXsecPb = 1.0;
+   double targetLumiFb = 0.001;
+   double targetLumiPb = 1.0;
+   double mcNorm = 1.0;
+   if (isMC) {
+      if (mcNormTag.empty()) {
+         std::cerr << "[WEIGHT] ERROR: mcNormTag is empty. Set it in the active MC campaign block." << std::endl;
+         assert(false && "Missing MC normalization tag");
+      }
+      ttToLNu2QXsecPb = ReadNamedDouble(mcNormFile, "xsecPb");
+      targetLumiFb = ReadLumiFb(mcNormFile);
+      targetLumiPb = targetLumiFb * 1000.0;
+      mcNorm = ttToLNu2QXsecPb * targetLumiPb;
+   }
+
+   auto initPSWeightLayout = [&]() {
+      if (!isMC || psLayoutInitialized) return;
+
+      if (nPSWeight == 44) {
+         isJMENanoPS   = true;
+         isPromptNanoPS = false;
+
+         // Mapping from JMENano documentation:
+         // JMENano:
+         //   [2] fsr.murfac=0.5
+         //   [3] fsr.murfac=2.0
+         //   [4] fsr.murfac=0.25
+         idx_fsr_2p0  = 3;
+         idx_fsr_0p5  = 2;
+         idx_fsr_0p25 = 4;
+
+         std::cout << "[PSWeight] Detected JMENano layout (nPSWeight=44)\n"
+                   << "  fsr.murfac=2.0  -> PSWeight[" << idx_fsr_2p0  << "]\n"
+                   << "  fsr.murfac=0.5  -> PSWeight[" << idx_fsr_0p5  << "]\n"
+                   << "  fsr.murfac=0.25 -> PSWeight[" << idx_fsr_0p25 << "]\n";
+      }
+      else if (nPSWeight == 4) {
+         isJMENanoPS   = false;
+         isPromptNanoPS = true;
+
+         // Regular NanoAOD / PromptNano:
+         //   [1] fsr.murfac=2.0
+         //   [3] fsr.murfac=0.5
+         idx_fsr_2p0  = 1;
+         idx_fsr_0p5  = 3;
+         idx_fsr_0p25 = -1;
+
+         std::cout << "[PSWeight] Detected regular/PromptNano layout (nPSWeight=4)\n"
+                   << "  fsr.murfac=2.0  -> PSWeight[" << idx_fsr_2p0  << "]\n"
+                   << "  fsr.murfac=0.5  -> PSWeight[" << idx_fsr_0p5  << "]\n"
+                   << "  fsr.murfac=0.25 -> not available\n";
+      }
+      else {
+         std::cerr << "[PSWeight] ERROR: unexpected nPSWeight = " << nPSWeight << std::endl;
+         assert(false && "Unknown PSWeight layout");
+      }
+
+      if (requireJMENanoForFSR025) {
+         assert(nPSWeight == 44 && "This study requires JMENano (nPSWeight==44) for fsr.murfac=0.25");
+      }
+      std::cout << "[PSWeight] Branch title: "
+                << (fChain->GetBranch("PSWeight") ? fChain->GetBranch("PSWeight")->GetTitle() : "PSWeight branch not found")
+                << "\n";
+
+      psLayoutInitialized = true;
+   };
+
+   auto getFSRWeight = [&](double genW, int idx) -> double {
+      if (!usePSWeightsForFSR) return genW * mcNorm / sumGenWeight;
+      assert(isMC);
+      assert(psLayoutInitialized);
+      assert(idx >= 0);
+      assert(idx < nPSWeight);
+      assert(idx < static_cast<int>(sumGenWeightPS.size()));
+      assert(sumGenWeightPS[idx] != 0.0);
+
+      return genW * PSWeight[idx] * mcNorm / sumGenWeightPS[idx];
+   };
+
+   // ============================================================
+   // Runs-tree normalization: compute sumGenWeight and sumGenWeightPS
+   // without looping over all Events.
+   // ============================================================
+   if (isMC) {
+      std::cout << "[WEIGHT] Reading genEventSumw and PSSumw from Runs trees" << std::endl;
+
+      TStopwatch tRuns;
+      tRuns.Start();
+
+      TChain* chain = dynamic_cast<TChain*>(fChain);
+      std::vector<std::string> inputFiles;
+
+      if (chain) {
+         TObjArray* chainFiles = chain->GetListOfFiles();
+         assert(chainFiles);
+
+         for (int ifile = 0; ifile < chainFiles->GetEntries(); ++ifile) {
+            TChainElement* chEl = dynamic_cast<TChainElement*>(chainFiles->At(ifile));
+            if (!chEl) continue;
+            inputFiles.push_back(chEl->GetTitle());
+         }
+      } else {
+         TFile* currentFile = fChain->GetCurrentFile();
+         assert(currentFile);
+         inputFiles.push_back(currentFile->GetName());
+      }
+
+      for (size_t ifile = 0; ifile < inputFiles.size(); ++ifile) {
+         const char* fileName = inputFiles[ifile].c_str();
+         TFile* fin = TFile::Open(fileName, "READ");
+         if (!fin || fin->IsZombie()) {
+            std::cerr << "[WEIGHT] ERROR: could not open input file for Runs tree: "
+                      << fileName << std::endl;
+            assert(false && "Could not open input file for Runs tree");
+         }
+
+         TTree* runs = dynamic_cast<TTree*>(fin->Get("Runs"));
+         if (!runs) {
+            std::cerr << "[WEIGHT] ERROR: no Runs tree in file: "
+                      << fileName << std::endl;
+            fin->Close();
+            assert(false && "Missing Runs tree");
+         }
+
+         Double_t run_genEventSumw = 0.0;
+         Int_t    run_nPSSumw = 0;
+         Double_t run_PSSumw[256];
+
+         runs->SetBranchAddress("genEventSumw", &run_genEventSumw);
+         runs->SetBranchAddress("nPSSumw", &run_nPSSumw);
+         runs->SetBranchAddress("PSSumw", run_PSSumw);
+
+         for (Long64_t irun = 0; irun < runs->GetEntries(); ++irun) {
+            runs->GetEntry(irun);
+
+            sumGenWeight += run_genEventSumw;
+
+            if (sumGenWeightPS.empty()) {
+               sumGenWeightPS.assign(run_nPSSumw, 0.0);
+            }
+
+            if (static_cast<size_t>(run_nPSSumw) != sumGenWeightPS.size()) {
+               std::cerr << "[WEIGHT] ERROR: nPSSumw changed from "
+                         << sumGenWeightPS.size() << " to " << run_nPSSumw
+                         << " in file " << fileName << std::endl;
+               fin->Close();
+               assert(false && "Inconsistent nPSSumw across Runs trees");
+            }
+
+            for (Int_t ips = 0; ips < run_nPSSumw; ++ips) {
+               sumGenWeightPS[ips] += run_genEventSumw * run_PSSumw[ips];
+            }
+         }
+
+         if ((ifile + 1) % 10 == 0 || ifile + 1 == inputFiles.size()) {
+            std::cout << "[WEIGHT] Runs files " << (ifile + 1)
+                      << " / " << inputFiles.size()
+                      << "  (" << 100.0 * (ifile + 1) / inputFiles.size() << "%)"
+                      << std::endl;
+         }
+
+         fin->Close();
+      }
+
+      tRuns.Stop();
+
+      assert(!sumGenWeightPS.empty());
+      assert(sumGenWeight != 0.0);
+
+      std::cout << "[WEIGHT] Runs-tree normalization done in "
+                << tRuns.RealTime() << " s" << std::endl;
+      std::cout << "[WEIGHT] sumGenWeight = " << sumGenWeight << std::endl;
+      std::cout << "[WEIGHT] normalization tag = " << mcNormTag << std::endl;
+      std::cout << "[WEIGHT] normalization file = " << mcNormFile << std::endl;
+      std::cout << "[WEIGHT] xsec(pb) = " << ttToLNu2QXsecPb
+                << ", targetLumi(fb^-1) = " << targetLumiFb
+                << ", targetLumi(pb^-1) = " << targetLumiPb
+                << ", mcNorm = " << mcNorm << std::endl;
+
+      // Initialize PSWeight index layout using the first event.
+      // The sums above came from Runs, but the event-level PSWeight indices
+      // are still validated from the Events branch nPSWeight.
+      Long64_t firstEntry = LoadTree(0);
+      assert(firstEntry >= 0);
+      fChain->GetEntry(0);
+      initPSWeightLayout();
+
+      assert(static_cast<int>(sumGenWeightPS.size()) == nPSWeight);
+
+      // Reset branch/tree state before the real loop.
+      fChain->LoadTree(0);
+   }
+
    //nentries = 1000000;
+   double checkSumNormGenWeight = 0.0;
+   double checkSumFSR0p5 = 0.0;
+   double checkSumFSR2p0 = 0.0;
+   double checkSumFSR0p25 = 0.0;
+   bool printedNominalWeightMode = false;
+
    for (Long64_t jentry=0; jentry<nentries;jentry++) {
       Long64_t ientry = LoadTree(jentry);
       if (ientry < 0) break;
       nb = fChain->GetEntry(jentry);   nbytes += nb;
+      
+      if (isMC && !psLayoutInitialized) {
+         initPSWeightLayout();
+      }
+
+      const double normalizedGenWeight = (isMC ? genWeight * mcNorm / sumGenWeight : 1.0);
+      if (isMC) {
+         checkSumNormGenWeight += normalizedGenWeight;
+
+         if (idx_fsr_0p5 >= 0)
+            checkSumFSR0p5 += genWeight * PSWeight[idx_fsr_0p5] * mcNorm / sumGenWeightPS[idx_fsr_0p5];
+
+         if (idx_fsr_2p0 >= 0)
+            checkSumFSR2p0 += genWeight * PSWeight[idx_fsr_2p0] * mcNorm / sumGenWeightPS[idx_fsr_2p0];
+
+         if (idx_fsr_0p25 >= 0)
+            checkSumFSR0p25 += genWeight * PSWeight[idx_fsr_0p25] * mcNorm / sumGenWeightPS[idx_fsr_0p25];
+      }
+
+      if (isMC && jentry < 5) {
+         std::cout << "\n[WEIGHTS] " << jentry << "\n";
+         std::cout << "  genWeight raw        = " << genWeight << "\n";
+         std::cout << "  genWeight normalized = " << normalizedGenWeight
+                   << "  (genWeight * mcNorm / sumGenWeight)\n";
+
+         const int nPSPrint = std::min(4, std::min(nPSWeight, static_cast<int>(sumGenWeightPS.size())));
+         for (int ips = 0; ips < nPSPrint; ++ips) {
+            const double wps = genWeight * PSWeight[ips] * mcNorm / sumGenWeightPS[ips];
+            std::cout << "  PSWeight[" << ips << "] raw = " << PSWeight[ips]
+                      << ", normalized = " << wps
+                      << "  (genWeight * PSWeight[" << ips << "] * mcNorm / sumGenWeightPS[" << ips << "])\n";
+         }
+
+         if (idx_fsr_0p5 >= 0) {
+            double w = getFSRWeight(genWeight, idx_fsr_0p5);
+            std::cout << "  FSR 0.5 normalized  = " << w
+                      << "  from PSWeight[" << idx_fsr_0p5 << "]\n";
+         }
+
+         if (idx_fsr_2p0 >= 0) {
+            double w = getFSRWeight(genWeight, idx_fsr_2p0);
+            std::cout << "  FSR 2.0 normalized  = " << w
+                      << "  from PSWeight[" << idx_fsr_2p0 << "]\n";
+         }
+
+         if (idx_fsr_0p25 >= 0) {
+            double w = getFSRWeight(genWeight, idx_fsr_0p25);
+            std::cout << "  FSR 0.25 normalized = " << w
+                      << "  from PSWeight[" << idx_fsr_0p25 << "]\n";
+         }
+      }
+
       // if (Cut(ientry) < 0) continue;
       if (!passRunEraSelection(run)) continue;
       runCountAfterSplit[run]++;
 
-      if (jentry%nlap==0) {
-         cout << "." << flush;
-      }
       if (jentry%nlap2==0 && jentry!=0) {
          double time = t.RealTime();
-      if (time>0) cout << Form("\n\%1.0f ev/s\n",nlap2/time) << flush;
+         double rate = (time > 0.0 ? nlap2 / time : 0.0);
+         std::cout << "[LOOP] entry " << jentry
+                   << " / " << nentries
+                   << "  (" << 100.0 * jentry / nentries << "%)"
+                   << "  rate = " << rate << " ev/s"
+                   << std::endl;
          t.Reset();
          t.Start();
       }
@@ -1071,9 +1729,15 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
          GenJet_minPartonDR.assign(nGenJet, 999.0);
          GenJet_passSel.assign(nGenJet, 0);
 
-         // Nominal and FSR PS weights for Gen/parton studies
-         double w_fsrUp = genWeight * PSWeight[3]; // fsr.murfac=0.5
-         double w_fsrDown  = genWeight * PSWeight[1]; // fsr.murfac=2.0
+         // Nominal and FSR weights for Gen/parton studies
+         // If usePSWeightsForFSR=false, these reduce to genWeight only.
+         double w_fsrUp   = getFSRWeight(genWeight, idx_fsr_0p5);
+         double w_fsrDown = getFSRWeight(genWeight, idx_fsr_2p0);
+
+         double w_fsr025 = normalizedGenWeight;
+         if (idx_fsr_0p25 >= 0) {
+            w_fsr025 = getFSRWeight(genWeight, idx_fsr_0p25);
+         }
 
          // ===== Loop 1: for each GenJet, find best core parton (dr<0.2) and compute min DR between in-cone partons =====
          for (int igj = 0; igj < nGenJet; ++igj) {
@@ -1157,9 +1821,9 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
             if (partonPt <= 0.0) continue; // require also the core match dr<0.2 + flavour match
 
             const double genPt = GenJet_pt[igj];
-            p_partonPt_vs_partonPt->Fill(partonPt, partonPt, genWeight);
-            p_genJetPt_vs_partonPt->Fill(partonPt, genPt, genWeight);
-            p_genJetPtOverPartonPt_vs_partonPt->Fill(partonPt, genPt / partonPt, genWeight);
+            p_partonPt_vs_partonPt->Fill(partonPt, partonPt, normalizedGenWeight);
+            p_genJetPt_vs_partonPt->Fill(partonPt, genPt, normalizedGenWeight);
+            p_genJetPtOverPartonPt_vs_partonPt->Fill(partonPt, genPt / partonPt, normalizedGenWeight);
 
             // FSR up/down
             p_partonPt_vs_partonPt_fsrUp->Fill(partonPt, partonPt, w_fsrUp);
@@ -1179,9 +1843,9 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
             const bool reg2 = (dmin >= thr1 && dmin < thr2);
             const bool reg3 = (dmin >= thr2); // includes dmin=999 (0/1 parton in cone)
 
-            if (reg1) p_genJetPtOverPartonPt_vs_partonPt_dlt0p5R->Fill(partonPt, genPt/partonPt, genWeight);
-            if (reg2) p_genJetPtOverPartonPt_vs_partonPt_d0p5to2R->Fill(partonPt, genPt/partonPt, genWeight);
-            if (reg3) p_genJetPtOverPartonPt_vs_partonPt_dgt2R->Fill(partonPt, genPt/partonPt, genWeight);
+            if (reg1) p_genJetPtOverPartonPt_vs_partonPt_dlt0p5R->Fill(partonPt, genPt/partonPt, normalizedGenWeight);
+            if (reg2) p_genJetPtOverPartonPt_vs_partonPt_d0p5to2R->Fill(partonPt, genPt/partonPt, normalizedGenWeight);
+            if (reg3) p_genJetPtOverPartonPt_vs_partonPt_dgt2R->Fill(partonPt, genPt/partonPt, normalizedGenWeight);
             
 
             // Category splits by GenJet_partonFlavour
@@ -1189,9 +1853,9 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
             bool isLightJet = (std::abs(GenJet_partonFlavour[igj]) >= 1 && std::abs(GenJet_partonFlavour[igj]) <= 4);
 
             if (isBJet) {
-               p_partonPt_vs_partonPt_b->Fill(partonPt, partonPt, genWeight);
-               p_genJetPt_vs_partonPt_b->Fill(partonPt, genPt, genWeight);
-               p_genJetPtOverPartonPt_vs_partonPt_b->Fill(partonPt, genPt / partonPt, genWeight);
+               p_partonPt_vs_partonPt_b->Fill(partonPt, partonPt, normalizedGenWeight);
+               p_genJetPt_vs_partonPt_b->Fill(partonPt, genPt, normalizedGenWeight);
+               p_genJetPtOverPartonPt_vs_partonPt_b->Fill(partonPt, genPt / partonPt, normalizedGenWeight);
 
                p_partonPt_vs_partonPt_b_fsrUp->Fill(partonPt, partonPt, w_fsrUp);
                p_partonPt_vs_partonPt_b_fsrDown->Fill(partonPt, partonPt, w_fsrDown);
@@ -1202,9 +1866,9 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
             }
 
             if (isLightJet) {
-               p_partonPt_vs_partonPt_light->Fill(partonPt, partonPt, genWeight);
-               p_genJetPt_vs_partonPt_light->Fill(partonPt, genPt, genWeight);
-               p_genJetPtOverPartonPt_vs_partonPt_light->Fill(partonPt, genPt / partonPt, genWeight);
+               p_partonPt_vs_partonPt_light->Fill(partonPt, partonPt, normalizedGenWeight);
+               p_genJetPt_vs_partonPt_light->Fill(partonPt, genPt, normalizedGenWeight);
+               p_genJetPtOverPartonPt_vs_partonPt_light->Fill(partonPt, genPt / partonPt, normalizedGenWeight);
 
                p_partonPt_vs_partonPt_light_fsrUp->Fill(partonPt, partonPt, w_fsrUp);
                p_partonPt_vs_partonPt_light_fsrDown->Fill(partonPt, partonPt, w_fsrDown);
@@ -1238,7 +1902,7 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
          }
 
          // avgPU filter
-         if (runYear != 2026) {
+         if (runYear != 2026 && runYear != 2024 && runYear != 2025) {
                if (_avgpu[run][luminosityBlock] == 0) {
                ++_nbadevents_lumi;
                continue;
@@ -1246,8 +1910,58 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
          }
          ++_nevents;
       }
-         double w = (isMC ? (PSWeight[3]*genWeight) : 1);    //in case of MC set w to genWeight, otherwise (data) leave it 1
-         if (isMC) h_sumw->Fill(0.5, genWeight);
+         //double w = (isMC ? (genWeight) : 1);//(PSWeight[3]*genWeight) : 1);    //in case of MC set w to genWeight, otherwise (data) leave it 1
+         double w = 1.0;
+
+         if (isMC) {
+            w = normalizedGenWeight; // default nominal
+
+            if (nominalPSMode == 1) {
+               assert(psLayoutInitialized);
+               assert(idx_fsr_0p5 >= 0);
+               assert(sumGenWeightPS[idx_fsr_0p5] != 0.0);
+               w = genWeight * PSWeight[idx_fsr_0p5] * mcNorm / sumGenWeightPS[idx_fsr_0p5];
+            }
+            else if (nominalPSMode == 2) {
+               assert(psLayoutInitialized);
+               assert(idx_fsr_2p0 >= 0);
+               assert(sumGenWeightPS[idx_fsr_2p0] != 0.0);
+               w = genWeight * PSWeight[idx_fsr_2p0] * mcNorm / sumGenWeightPS[idx_fsr_2p0];
+            }
+            else if (nominalPSMode == 3) {
+               assert(psLayoutInitialized);
+               assert(idx_fsr_0p25 >= 0 && "nominalPSMode=3 requires JMENano fsr.murfac=0.25");
+               assert(sumGenWeightPS[idx_fsr_0p25] != 0.0);
+               w = genWeight * PSWeight[idx_fsr_0p25] * mcNorm / sumGenWeightPS[idx_fsr_0p25];
+            }
+            else {
+               assert(nominalPSMode == 0 && "Unsupported nominalPSMode value");
+            }
+
+            if (!printedNominalWeightMode) {
+               std::cout << "[WEIGHT] nominalPSMode = " << nominalPSMode << std::endl;
+               if (nominalPSMode == 0) {
+                  std::cout << "[WEIGHT] Using nominal normalized genWeight: "
+                            << "genWeight * mcNorm / sumGenWeight" << std::endl;
+               }
+               else if (nominalPSMode == 1) {
+                  std::cout << "[WEIGHT] Using PSWeight FSR 0.5 as event weight: "
+                            << "PSWeight[" << idx_fsr_0p5 << "]" << std::endl;
+               }
+               else if (nominalPSMode == 2) {
+                  std::cout << "[WEIGHT] Using PSWeight FSR 2.0 as event weight: "
+                            << "PSWeight[" << idx_fsr_2p0 << "]" << std::endl;
+               }
+               else if (nominalPSMode == 3) {
+                  std::cout << "[WEIGHT] Using PSWeight FSR 0.25 as event weight: "
+                            << "PSWeight[" << idx_fsr_0p25 << "]" << std::endl;
+               }
+               std::cout << "[WEIGHT] First event weight with this mode = " << w << std::endl;
+               printedNominalWeightMode = true;
+            }
+         }
+         
+         if (isMC) h_sumw->Fill(0.5, normalizedGenWeight);
 
          double Pileup_nTrue = Pileup_nTrueInt;
 
@@ -1357,7 +2071,6 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
                   double dR(999);
                   p4.SetPtEtaPhiM(Jet_pt[i], Jet_eta[i], Jet_phi[i], Jet_mass[i]);
 
-
                   if (Jet_genJetIdx[i] >= 0 ){ // && Jet_genJetIdx[i] < nGenJet)
                      int j = Jet_genJetIdx[i];
                      p4g.SetPtEtaPhiM(GenJet_pt[j], GenJet_eta[j], GenJet_phi[j],
@@ -1388,16 +2101,32 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
                   // The method presented here can be found in https://twiki.cern.ch/twiki/bin/viewauth/CMS/JetResolution
                   // and the corresponding code in https://github.com/cms-sw/cmssw/blob/CMSSW_8_0_25/PhysicsTools/PatUtils/interface/SmearedJetProducerT.h
                   assert(jer);
-                  double Reso = jer->getResolution({{JME::Binning::JetPt, jPt}, {JME::Binning::JetEta, jEta}, {JME::Binning::Rho, rho}});
+
+                  bool condPt = (jPtGen > MIN_JET_ENERGY && dR < 0.2);
+                  // Use gen pT when a matched gen jet exists, otherwise fall back to reco pT
+                  double ptForJER = condPt ? jPtGen : jPt;
+                  // Keep eta from the reco jet
+                  double etaForJER = jEta;
+
+                  double Reso = jer->getResolution({
+                     {JME::Binning::JetPt,  ptForJER},
+                     {JME::Binning::JetEta, etaForJER},
+                     {JME::Binning::Rho,    rho}
+                  }); //double Reso = jer->getResolution({{JME::Binning::JetPt, jPt}, {JME::Binning::JetEta, jEta}, {JME::Binning::Rho, rho}});
+
+
                   double SF(1);
                   if (useJERSFvsPt && jersfvspt) {
-                     jersfvspt->setJetEta(jEta);
-                     jersfvspt->setJetPt(jPt);
+                     jersfvspt->setJetEta(etaForJER);
+                     jersfvspt->setJetPt(ptForJER);
                      jersfvspt->setRho(rho);
                      SF = jersfvspt->getCorrection();
                   }
                   else if (!useJERSFvsPt && jersf){
-                     SF = jersf->getScaleFactor({{JME::Binning::JetEta, jEta}, {JME::Binning::Rho, rho}}, Variation::NOMINAL);
+                        SF = jersf->getScaleFactor({
+                           {JME::Binning::JetEta, etaForJER},
+                           {JME::Binning::Rho,    rho}
+                        }, Variation::NOMINAL);          //SF = jersf->getScaleFactor({{JME::Binning::JetEta, jEta}, {JME::Binning::Rho, rho}}, Variation::NOMINAL);
                   //cout << "JER SF from jersf path" << endl;
                   }
                   else {
@@ -1408,11 +2137,9 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
 
                   // Case 0: by default the JER correction factor is equal to 1
                   double CF = 1.;
-                  // We see if the gen jet meets our requirements
-                  bool condPt = (jPtGen > MIN_JET_ENERGY && dR < 0.2);
-                  double relDPt = condPt ? (jPt - jPtGen) / jPt : 0.0;
-                  bool condPtReso = fabs(relDPt) < 3 * Reso;
-                  if (condPt and condPtReso) {
+                  double relDPt = condPt ? ((jPt - jPtGen) / jPtGen) : 0.0; //(jPt - jPtGen) / jPt
+                  bool condPtReso = condPt ? (std::abs(relDPt) < 3.0 * Reso) : false; //bool condPtReso = fabs((jPt - jPtGen) / jPt) < 3 * Reso; //fabs(relDPt) < 3 * Reso;
+                  if (condPt && condPtReso) {
                      // Case 1: we have a "good" gen jet matched to the reco jet (indicated by positive gen jet pt)
                      CF += (SF - 1.) * relDPt;
                   }
@@ -1482,7 +2209,7 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
          int nBTaggedJets = 0;
          double btagThreshold_skim = 0.0849; // same threshold as in skimming
          for (int j = 0; j < nJet; j++) {
-               if (Jet_pt[j] > 15. && std::abs(Jet_eta[j]) < 2.4) {
+               if (Jet_pt[j] > 15. && std::abs(Jet_eta[j]) < 2.5) {
                   ++nSelectedJets;
                   if (Jet_btagUParTAK4B[j] > btagThreshold_skim) {
                      ++nBTaggedJets;
@@ -1506,9 +2233,9 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
                for (int iMu = 0; iMu < nMuon; iMu++) {
                   double mu_pt  = Muon_pt[iMu];
                   double mu_eta = Muon_eta[iMu];
-                  bool passMuonId = Muon_looseId[iMu];//Muon_tightId[iMu];
+                  bool passMuonId = Muon_tightId[iMu];//Muon_tightId[iMu];
                   bool passMuonIsoId = (Muon_puppiIsoId[iMu] >= 1); //==3
-                  if (passMuonIsoId && passMuonId && (mu_pt > 15.) && (fabs(mu_eta) < 2.4)){
+                  if (passMuonIsoId && passMuonId && (mu_pt > 30.) && (fabs(mu_eta) < 2.4)){
                      // This muon passes our selection, so store the muon index (iMu)
                      goodMuonIndices.push_back(iMu);
                   }
@@ -1536,10 +2263,10 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
                   if (j == Muon_jetIdx[goodMuonIndices[0]]) continue;
                  
                   // If this jet passes the b-tag threshold => b-jet
-                  if ((Jet_btagUParTAK4B[j] > btagThreshold) && (Jet_pt[j]  > 15.) && (fabs(Jet_eta[j]) < 2.4)) {
+                  if ((Jet_btagUParTAK4B[j] > btagThreshold) && (Jet_pt[j]  > 15.) && (fabs(Jet_eta[j]) < 2.5)) {
                      bjetIndices.push_back(j);
                   } 
-                  else if (lightJetIndices.size() < 2 && (Jet_pt[j]  > 15.) && (fabs(Jet_eta[j]) < 2.4)){
+                  else if (lightJetIndices.size() < 2 && (Jet_pt[j]  > 15.) && (fabs(Jet_eta[j]) < 2.5)){
                      //bool passesPt = (Jet_pt[j]  > 15.);
                      //bool passesEta  = (fabs(Jet_eta[j]) < 2.4); //myös blle^ > 30GeV jos pt alle 30GeV mutta b -> ei light!
                      // otherwise, treat it as a "light jet" 
@@ -1691,8 +2418,8 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
                // ---------- Selection-category fills (no auto, no function) ----------
                if (isMC) {
                // Nominal and FSR PS weights for Gen/parton studies
-               double w_fsrDown = genWeight * PSWeight[3]; // fsr.murfac=0.5
-               double w_fsrUp   = genWeight * PSWeight[1]; // fsr.murfac=2.0
+               double w_fsrDown = getFSRWeight(genWeight, idx_fsr_0p5); // fsr.murfac=0.5
+               double w_fsrUp   = getFSRWeight(genWeight, idx_fsr_2p0); // fsr.murfac=2.0
 
                   // ---- selB: leadBJet ----
                   {
@@ -1702,7 +2429,7 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
                         if (partonPt > 0) {
                            double genPt = GenJet_pt[genIdx];
 
-                           p_genJetPtOverPartonPt_vs_partonPt_selB->Fill(partonPt, genPt / partonPt, genWeight);
+                           p_genJetPtOverPartonPt_vs_partonPt_selB->Fill(partonPt, genPt / partonPt, normalizedGenWeight);
                            p_genJetPtOverPartonPt_vs_partonPt_selB_fsrUp->Fill(partonPt, genPt / partonPt, w_fsrUp);
                            p_genJetPtOverPartonPt_vs_partonPt_selB_fsrDown->Fill(partonPt, genPt / partonPt, w_fsrDown);
                         }
@@ -1717,7 +2444,7 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
                         if (partonPt > 0) {
                            double genPt = GenJet_pt[genIdx];
 
-                           p_genJetPtOverPartonPt_vs_partonPt_selB->Fill(partonPt, genPt / partonPt, genWeight);
+                           p_genJetPtOverPartonPt_vs_partonPt_selB->Fill(partonPt, genPt / partonPt, normalizedGenWeight);
                            p_genJetPtOverPartonPt_vs_partonPt_selB_fsrUp->Fill(partonPt, genPt / partonPt, w_fsrUp);
                            p_genJetPtOverPartonPt_vs_partonPt_selB_fsrDown->Fill(partonPt, genPt / partonPt, w_fsrDown);
                         }
@@ -1734,7 +2461,7 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
                         if (partonPt > 0) {
                            double genPt = GenJet_pt[genIdx];
 
-                           p_genJetPtOverPartonPt_vs_partonPt_selLight->Fill(partonPt, genPt / partonPt, genWeight);
+                           p_genJetPtOverPartonPt_vs_partonPt_selLight->Fill(partonPt, genPt / partonPt, normalizedGenWeight);
                            p_genJetPtOverPartonPt_vs_partonPt_selLight_fsrUp->Fill(partonPt, genPt / partonPt, w_fsrUp);
                            p_genJetPtOverPartonPt_vs_partonPt_selLight_fsrDown->Fill(partonPt, genPt / partonPt, w_fsrDown);
                         }
@@ -1749,7 +2476,7 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
                         if (partonPt > 0) {
                            double genPt = GenJet_pt[genIdx];
 
-                           p_genJetPtOverPartonPt_vs_partonPt_selLight->Fill(partonPt, genPt / partonPt, genWeight);
+                           p_genJetPtOverPartonPt_vs_partonPt_selLight->Fill(partonPt, genPt / partonPt, normalizedGenWeight);
                            p_genJetPtOverPartonPt_vs_partonPt_selLight_fsrUp->Fill(partonPt, genPt / partonPt, w_fsrUp);
                            p_genJetPtOverPartonPt_vs_partonPt_selLight_fsrDown->Fill(partonPt, genPt / partonPt, w_fsrDown);
                         }
@@ -1765,7 +2492,7 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
                            if (partonPt > 0) {
                               double genPt = GenJet_pt[genIdx];
 
-                              p_genJetPtOverPartonPt_vs_partonPt_selLight->Fill(partonPt, genPt / partonPt, genWeight);
+                              p_genJetPtOverPartonPt_vs_partonPt_selLight->Fill(partonPt, genPt / partonPt, normalizedGenWeight);
                               p_genJetPtOverPartonPt_vs_partonPt_selLight_fsrUp->Fill(partonPt, genPt / partonPt, w_fsrUp);
                               p_genJetPtOverPartonPt_vs_partonPt_selLight_fsrDown->Fill(partonPt, genPt / partonPt, w_fsrDown);
                            }
@@ -1779,7 +2506,7 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
                            if (partonPt > 0) {
                               double genPt = GenJet_pt[genIdx];
 
-                              p_genJetPtOverPartonPt_vs_partonPt_selLight->Fill(partonPt, genPt / partonPt, genWeight);
+                              p_genJetPtOverPartonPt_vs_partonPt_selLight->Fill(partonPt, genPt / partonPt, normalizedGenWeight);
                               p_genJetPtOverPartonPt_vs_partonPt_selLight_fsrUp->Fill(partonPt, genPt / partonPt, w_fsrUp);
                               p_genJetPtOverPartonPt_vs_partonPt_selLight_fsrDown->Fill(partonPt, genPt / partonPt, w_fsrDown);
                            }
@@ -2064,6 +2791,7 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
                h_rbl->Fill(rbl, w);
 
                double pt_pair = TMath::Sqrt( lj1_p4.Pt() * lj2_p4.Pt());
+               //double pt_pair = 0.5 * (lj1_p4.Pt() + lj2_p4.Pt());
                double pt_pair_improved = (80.4/W_p4.M()) * pt_pair;
                
                if (secondLightJet >= 0) {
@@ -2331,6 +3059,23 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
             }*/
          } 
       } // jentry
+
+      if (isMC) {
+         std::cout << "[CHECK] sum normalizedGenWeight = "
+                  << checkSumNormGenWeight << std::endl;
+
+         if (idx_fsr_0p5 >= 0)
+            std::cout << "[CHECK] sum normalized FSR 0.5 = "
+                     << checkSumFSR0p5 << std::endl;
+
+         if (idx_fsr_2p0 >= 0)
+            std::cout << "[CHECK] sum normalized FSR 2.0 = "
+                     << checkSumFSR2p0 << std::endl;
+
+         if (idx_fsr_0p25 >= 0)
+            std::cout << "[CHECK] sum normalized FSR 0.25 = "
+                     << checkSumFSR0p25 << std::endl;
+      }
          //cout << "Skipped " << _nbadevents_json << " events due to JSON ("
 	      //<< (100.*_nbadevents_json/_nevents) << "%) \n";
       if (fmap) {

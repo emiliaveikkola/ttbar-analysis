@@ -1,2 +1,2 @@
 xsecPb 405.87
-targetLumiFb 15.922661004
+targetLumiFb 18.701199835

@@ -542,7 +542,8 @@ void WMassRun3::Loop()
    static const std::string runEra = "D"; // for 2025: "A", "B", etc.
    std::string jsonFile, jecMCSet, jecDataSet, outputFile, jetVetoMap, JERSFvsPt, JERres;
    std::string mcNormTag; // input_files/mc_norm_TTtoLNu2Q_<tag>.txt
-
+   //brilcalc lumi --normtag /cvmfs/cms-bril.cern.ch/cms-lumi-pog/Normtags/normtag_BRIL.json -u /fb -i Collisions26_MLEnhancedGolden_Latest.json | tee brilcalc_lumi_2026.log
+   // lumi_fb=$(awk -F'|' ' /#Summary/ {s=1; next} s && $2 ~ /[0-9]/ {gsub(/^[ \t]+|[ \t]+$/, "", $7);print $7;exit}' brilcalc_lumi_2026.log) echo "$lumi_fb"
    bool TopPtDependentMass = false;
    bool isMC = false;
    // JER smearing (JER SF)
@@ -576,24 +577,24 @@ void WMassRun3::Loop()
          JERres     = "Summer23BPixPrompt23_RunD_JRV1_MC_PtResolution_AK4PFPuppi.txt";
 
          if (JERSF == "2024") {
-            JERSFvsPt  = "ClosureTest/Prompt24_MC_SF/Prompt24_2024_nib_JRV10M_MC_SF_AK4PFPuppi";
+            JERSFvsPt  = "ClosureTest2/Prompt24_MC_SF/Prompt24_2024_nib_JRV11M_MC_SF_AK4PFPuppi";
             mcNormTag  = "2024";
-            outputFile = "closure/Summer24_TTtoLNu2Q_JMENano_V10M_JER2024nib_e6.root";
+            outputFile = "closure/V2/Summer24_TTtoLNu2Q_JMENano_V11M_JER2024nib_e7.root";
          }
          else if (JERSF == "2025") {
-            JERSFvsPt  = "ClosureTest/Prompt25_MC_SF/Prompt25_2025CDEFG_JRV4M_MC_SF_AK4PFPuppi";
+            JERSFvsPt  = "ClosureTest2/Prompt25_MC_SF/Prompt25_2025CDEFG_JRV5M_MC_SF_AK4PFPuppi";
             mcNormTag  = "2025";
-            outputFile = "closure/Summer24_TTtoLNu2Q_JMENano_V4M_JER2025CDEFG_e6.root";
+            outputFile = "closure/V2/Summer24_TTtoLNu2Q_JMENano_V5M_JER2025CDEFG_e7.root";
          }
          else if (JERSF == "2026BD") {
-            JERSFvsPt  = "ClosureTest/Prompt26_MC_SF/Prompt26_2026B_JRV1M_MC_SF_AK4PFPuppi";
+            JERSFvsPt  = "ClosureTest2/Prompt26_MC_SF/Prompt26_2026B_JRV2M_MC_SF_AK4PFPuppi";
             mcNormTag  = "2026";
-            outputFile = "closure/Summer24_TTtoLNu2Q_JMENano_V1M_JER2026BD_e6.root";
+            outputFile = "closure/V2/Summer24_TTtoLNu2Q_JMENano_V2M_JER2026BD_e7.root";
          }
          else if (JERSF == "2026C") {
-            JERSFvsPt  = "ClosureTest/Prompt26_MC_SF/Prompt26_2026C_JRV1M_MC_SF_AK4PFPuppi";
+            JERSFvsPt  = "ClosureTest2/Prompt26_MC_SF/Prompt26_2026C_JRV2M_MC_SF_AK4PFPuppi";
             mcNormTag  = "2026";
-            outputFile = "closure/Summer24_TTtoLNu2Q_JMENano_V1M_JER2026C_e6.root";
+            outputFile = "closure/V2/Summer24_TTtoLNu2Q_JMENano_V2M_JER2026C_e7.root";
          }
          else {
             std::cerr << "Unsupported JERSF option: " << JERSF << std::endl;
@@ -603,29 +604,29 @@ void WMassRun3::Loop()
          if (runYear == 2024) {
             jsonFile   = "Cert_Collisions2024_378981_386951_Golden.json";
             jecMCSet   = "RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI";
-            jecDataSet = "Prompt24_V10M_DATA";
+            jecDataSet = "Prompt24_V11M_DATA";
             jetVetoMap = "jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root";
 
             if (runEra == "C") {
-               outputFile = "closure/Muon_Run2024C_ReReco_V10M_Golden_e6.root";
+               outputFile = "closure/V2/Muon_Run2024C_ReReco_V11M_Golden_e7.root";
             }
             else if (runEra == "D") {
-               outputFile = "closure/Muon_Run2024D_ReReco_V10M_Golden_e6.root";
+               outputFile = "closure/V2/Muon_Run2024D_ReReco_V11M_Golden_e7.root";
             }
             else if (runEra == "E") {
-               outputFile = "closure/Muon_Run2024E_ReReco_V10M_Golden_e6.root";
+               outputFile = "closure/V2/Muon_Run2024E_ReReco_V11M_Golden_e7.root";
             }
             else if (runEra == "F") {
-               outputFile = "closure/Muon_Run2024F_Prompt_V10M_Golden_e6.root";
+               outputFile = "closure/V2/Muon_Run2024F_Prompt_V11M_Golden_e7.root";
             }
             else if (runEra == "G") {
-               outputFile = "closure/Muon_Run2024G_Prompt_V10M_Golden_e6.root";
+               outputFile = "closure/V2/Muon_Run2024G_Prompt_V11M_Golden_e7.root";
             }
             else if (runEra == "H") {
-               outputFile = "closure/Muon_Run2024H_Prompt_V10M_Golden_e6.root";
+               outputFile = "closure/V2/Muon_Run2024H_Prompt_V11M_Golden_e7.root";
             }
             else if (runEra == "I") {
-               outputFile = "closure/Muon_Run2024I_Prompt_V10M_Golden_e6.root";
+               outputFile = "closure/V2/Muon_Run2024I_Prompt_V11M_Golden_e7.root";
             }
             else {
                std::cerr << "Unsupported 2024 runEra: " << runEra << std::endl;
@@ -637,45 +638,45 @@ void WMassRun3::Loop()
             jetVetoMap = "jet_veto_maps/jetveto2025CDEFG_V3M.root";
 
             if (runEra == "C") {
-               jecDataSet = "ClosureTest/Prompt25_DATA/Prompt25_Run2025C_V4M_DATA_L2L3Residual_AK4PFPuppi";
-               outputFile = "closure/Muon_Run2025C_Prompt_V4M_Golden_e6.root";
+               jecDataSet = "ClosureTest2/Prompt25_DATA/Prompt25_Run2025C_V5M_DATA_L2L3Residual_AK4PFPuppi";
+               outputFile = "closure/V2/Muon_Run2025C_Prompt_V5M_Golden_e7.root";
             }
             else if (runEra == "D") {
-               jecDataSet = "ClosureTest/Prompt25_DATA/Prompt25_Run2025D_V4M_DATA_L2L3Residual_AK4PFPuppi";
-               outputFile = "closure/Muon_Run2025D_Prompt_V4M_Golden_e6.root";
+               jecDataSet = "ClosureTest2/Prompt25_DATA/Prompt25_Run2025D_V5M_DATA_L2L3Residual_AK4PFPuppi";
+               outputFile = "closure/V2/Muon_Run2025D_Prompt_V5M_Golden_e7.root";
             }
             else if (runEra == "E") {
-               jecDataSet = "ClosureTest/Prompt25_DATA/Prompt25_Run2025E_V4M_DATA_L2L3Residual_AK4PFPuppi";
-               outputFile = "closure/Muon_Run2025E_Prompt_V4M_Golden_e6.root";
+               jecDataSet = "ClosureTest2/Prompt25_DATA/Prompt25_Run2025E_V5M_DATA_L2L3Residual_AK4PFPuppi";
+               outputFile = "closure/V2/Muon_Run2025E_Prompt_V5M_Golden_e7.root";
             }
             else if (runEra == "F") {
-               jecDataSet = "ClosureTest/Prompt25_DATA/Prompt25_Run2025F_V4M_DATA_L2L3Residual_AK4PFPuppi";
-               outputFile = "closure/Muon_Run2025F_Prompt_V4M_Golden_e6.root";
+               jecDataSet = "ClosureTest2/Prompt25_DATA/Prompt25_Run2025F_V5M_DATA_L2L3Residual_AK4PFPuppi";
+               outputFile = "closure/V2/Muon_Run2025F_Prompt_V5M_Golden_e7.root";
             }
             else if (runEra == "G") {
-               jecDataSet = "ClosureTest/Prompt25_DATA/Prompt25_Run2025G_V4M_DATA_L2L3Residual_AK4PFPuppi";
-               outputFile = "closure/Muon_Run2025G_Prompt_V4M_Golden_e6.root";
+               jecDataSet = "ClosureTest2/Prompt25_DATA/Prompt25_Run2025G_V5M_DATA_L2L3Residual_AK4PFPuppi";
+               outputFile = "closure/V2/Muon_Run2025G_Prompt_V5M_Golden_e7.root";
             }
             else {
                std::cerr << "Unsupported 2025 runEra: " << runEra << std::endl;
                return;
             }
          } else if (runYear == 2026) {
-            jsonFile   = "Collisions26_MLEnhancedGolden_Latest.json"; // 21.5.
+            jsonFile   = "Collisions26_MLEnhancedGolden_Latest.json"; // 21.5.e6 // 1.6. e7
             jecMCSet   = "Run3Winter26_PhiDependent_L2Relative_AK4PUPPI";
             jetVetoMap = "jet_veto_maps/jetveto2026B_V0M.root";
 
             if (runEra == "B") {
-               jecDataSet = "ClosureTest/Prompt26_DATA/Prompt26_Run2026B_V1M_DATA_L2L3Residual_AK4PFPuppi";
-               outputFile = "closure/Muon_Run2026B_Prompt_V1M_MLEnhancedGolden_Latest21.5._e6.root";
+               jecDataSet = "ClosureTest2/Prompt26_DATA/Prompt26_Run2026B_V2M_DATA_L2L3Residual_AK4PFPuppi";
+               outputFile = "closure/V2/Muon_Run2026B_Prompt_V2M_MLEnhancedGolden_Latest1.6._e7.root";
             }
             else if (runEra == "C") {
-               jecDataSet = "ClosureTest/Prompt26_DATA/Prompt26_Run2026C_V1M_DATA_L2L3Residual_AK4PFPuppi";
-               outputFile = "closure/Muon_Run2026C_Prompt_V1M_MLEnhancedGolden_Latest21.5._e6.root";
+               jecDataSet = "ClosureTest2/Prompt26_DATA/Prompt26_Run2026C_V2M_DATA_L2L3Residual_AK4PFPuppi";
+               outputFile = "closure/V2/Muon_Run2026C_Prompt_V2M_MLEnhancedGolden_Latest1.6._e7.root";
             }
             else if (runEra == "D") {
-               jecDataSet = "ClosureTest/Prompt26_DATA/Prompt26_Run2026D_V1M_DATA_L2L3Residual_AK4PFPuppi";
-               outputFile = "closure/Muon_Run2026D_Prompt_V1M_MLEnhancedGolden_Latest21.5._e6.root";
+               jecDataSet = "ClosureTest2/Prompt26_DATA/Prompt26_Run2026D_V2M_DATA_L2L3Residual_AK4PFPuppi";
+               outputFile = "closure/V2/Muon_Run2026D_Prompt_V2M_MLEnhancedGolden_Latest1.6._e7.root";
             }
             else {
                std::cerr << "Unsupported 2026 runEra: " << runEra << std::endl;

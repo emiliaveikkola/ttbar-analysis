@@ -84,7 +84,7 @@ void AddFilesRecursively(const TString &dirPath, TChain *chain) {
          // Always recurse into directories
          AddFilesRecursively(fullPath, chain);
       } else if (fname.EndsWith(".root") &&
-        (fullPath.Contains("2026D"))){ //|| fullPath.Contains("date-10Feb2026"))){//fullPath.Contains("date-23Jan2026_time-104810_commit-4d9fd29")) { 
+        (fullPath.Contains("2023D/"))){ //|| fullPath.Contains("date-10Feb2026"))){//fullPath.Contains("date-23Jan2026_time-104810_commit-4d9fd29")) { 
          //MC: date-14May2025_time-124123_commit-23dc684
          //CDE DataReprocessing: date-08May2025_time-160559_commit-23dc684
          //FGHI Prompt24: date-20May2025_time-131924_commit-23dc684
@@ -101,6 +101,7 @@ void AddFilesRecursively(const TString &dirPath, TChain *chain) {
          //MCWinter25: date-25Nov2025_time-142318_commit-4d9fd29
          //2026A: date-13Mar2026_time-091806_commit-4d9fd29
          //2026B: date-24Mar2026_time-112133_commit-65b2668
+         //2016 (fullPath.Contains("2016F/")) || (fullPath.Contains("2016G/")) || (fullPath.Contains("2016H/"))
          std::cout << "Adding file: " << fullPath.Data() << std::endl;
          chain->AddFile(fullPath);
       }
@@ -125,7 +126,8 @@ void mk_WMassRun3() {
    //TString mainDirectory = "/eos/user/e/eveikkol/Skim/Wqqm/2025/MCWinter25/";
    //TString mainDirectory = "/eos/user/e/eveikkol/Skim/Wqqm/2025/Data/";
    //TString mainDirectory = "/eos/user/e/eveikkol/Skim/Wqqm/2026/Data/2026A";
-   TString mainDirectory = "/eos/user/e/eveikkol/Skim/Wqqm/2026/Data/";
+   //TString mainDirectory = "/eos/user/e/eveikkol/Skim/Wqqm/2026/Data/";
+   TString mainDirectory = "/eos/user/e/eveikkol/Skim/Wqqm/2023/Data/";
 
    // Recursively add all ROOT files found under the main directory.
    AddFilesRecursively(mainDirectory, c);

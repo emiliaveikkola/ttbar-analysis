@@ -264,6 +264,7 @@ static std::string trim_copy(const std::string &s) {
 
 static std::string Find2024NibOutputFileFromFibs(const std::string& runEra,
                                                  const std::string& jecDataSet,
+                                                 const std::string& correctionVersion,
                                                  int verbosity = 0) {
    std::vector<std::string> fibCandidates;
    fibCandidates.push_back("CondFormats/JetMETObjects/data/" + jecDataSet + "/fibs.txt");
@@ -314,9 +315,20 @@ static std::string Find2024NibOutputFileFromFibs(const std::string& runEra,
 
       if (runEra != compactKey && runEra != underscoredKey) continue;
 
-      const bool isReReco = (!eraShort.empty() && (eraShort[0] == 'C' || eraShort[0] == 'D' || eraShort[0] == 'E'));
-      const std::string recoLabel = isReReco ? "ReReco_V9M" : "Prompt_V9M";
-      return "Muon_Run" + eraToken + "_" + nibToken + "_" + recoLabel + ".root";
+      const bool isReReco =
+         (!eraShort.empty() &&
+          (eraShort[0] == 'C' || eraShort[0] == 'D' || eraShort[0] == 'E'));
+
+      const std::string recoLabel =
+         isReReco ? "ReReco_" + correctionVersion : "Prompt_" + correctionVersion;
+
+      const std::string outputDir = "closure/V2/";
+
+      const std::string JSON = "Golden";
+
+      const std::string version = "e7";
+
+      return outputDir + "Muon_Run" + eraToken + "_" + nibToken + "_" + recoLabel + "_" + JSON + "_" + version + ".root";
    }
 
    return "";
@@ -537,10 +549,11 @@ void WMassRun3::Loop()
    //fout = new TFile("Muon_Run2024FGHI_ReReco.root", "RECREATE");
    //fout = new TFile("Summer24_TTtoLNu2Q.root", "RECREATE");
    // Year-based configuration
-   bool isClosureTest = true;
-   static const int runYear = 2026; // set to 2024 or 2025
+   bool isClosureTest = false;
+   static const int runYear = 2023; // set to 2024 or 2025
    static const std::string runEra = "D"; // for 2025: "A", "B", etc.
-   std::string jsonFile, jecMCSet, jecDataSet, outputFile, jetVetoMap, JERSFvsPt, JERres;
+   bool isNIBS = false;
+   std::string jsonFile, jecMCSet, jecDataSet, outputFile, jetVetoMap, JERSFvsPt, JERres, correctionVersion;
    std::string mcNormTag; // input_files/mc_norm_TTtoLNu2Q_<tag>.txt
    //brilcalc lumi --normtag /cvmfs/cms-bril.cern.ch/cms-lumi-pog/Normtags/normtag_BRIL.json -u /fb -i Collisions26_MLEnhancedGolden_Latest.json | tee brilcalc_lumi_2026.log
    // lumi_fb=$(awk -F'|' ' /#Summary/ {s=1; next} s && $2 ~ /[0-9]/ {gsub(/^[ \t]+|[ \t]+$/, "", $7);print $7;exit}' brilcalc_lumi_2026.log) echo "$lumi_fb"
@@ -627,8 +640,15 @@ void WMassRun3::Loop()
             }
             else if (runEra == "I") {
                outputFile = "closure/V2/Muon_Run2024I_Prompt_V11M_Golden_e7.root";
-            }
-            else {
+            } 
+            if (isNIBS){ //nibs
+               correctionVersion = "V11M";
+               if (runEra == "Fnib1") outputFile = Find2024NibOutputFileFromFibs(runEra, jecDataSet, correctionVersion, 1);
+               else if (runEra == "Fnib2") outputFile = Find2024NibOutputFileFromFibs(runEra, jecDataSet, correctionVersion, 1);
+               else if (runEra == "Fnib3") outputFile = Find2024NibOutputFileFromFibs(runEra, jecDataSet, correctionVersion, 1);
+               else if (runEra == "Gnib1") outputFile = Find2024NibOutputFileFromFibs(runEra, jecDataSet, correctionVersion, 1);
+               else if (runEra == "Gnib2") outputFile = Find2024NibOutputFileFromFibs(runEra, jecDataSet, correctionVersion, 1);
+            } else {
                std::cerr << "Unsupported 2024 runEra: " << runEra << std::endl;
                return;
             }
@@ -662,21 +682,24 @@ void WMassRun3::Loop()
                return;
             }
          } else if (runYear == 2026) {
-            jsonFile   = "Collisions26_MLEnhancedGolden_Latest.json"; // 21.5.e6 // 1.6. e7
+            //jsonFile   = "Collisions26_MLEnhancedGolden_Latest.json"; // 21.5.e6 // 1.6. e7
             jecMCSet   = "Run3Winter26_PhiDependent_L2Relative_AK4PUPPI";
             jetVetoMap = "jet_veto_maps/jetveto2026B_V0M.root";
 
             if (runEra == "B") {
+               jsonFile   = "Collisions26_MLEnhancedGolden_Latest.json"; // 21.5.e6 // 1.6. e7
                jecDataSet = "ClosureTest2/Prompt26_DATA/Prompt26_Run2026B_V2M_DATA_L2L3Residual_AK4PFPuppi";
-               outputFile = "closure/V2/Muon_Run2026B_Prompt_V2M_MLEnhancedGolden_Latest1.6._e7.root";
+               outputFile = "closure/V2/Muon_Run2026B_Prompt_V2M_MLEnhancedGolden_Latest1.6_e7.root";
             }
             else if (runEra == "C") {
+               jsonFile   = "Cert_Collisions2026_lowPU.json"; //e8
                jecDataSet = "ClosureTest2/Prompt26_DATA/Prompt26_Run2026C_V2M_DATA_L2L3Residual_AK4PFPuppi";
-               outputFile = "closure/V2/Muon_Run2026C_Prompt_V2M_MLEnhancedGolden_Latest1.6._e7.root";
+               outputFile = "closure/V2/Muon_Run2026C_Prompt_V2M_lowPU_e8.root";
             }
             else if (runEra == "D") {
+               jsonFile   = "Cert_Collisions2026_401624_403937_golden.json"; //e8
                jecDataSet = "ClosureTest2/Prompt26_DATA/Prompt26_Run2026D_V2M_DATA_L2L3Residual_AK4PFPuppi";
-               outputFile = "closure/V2/Muon_Run2026D_Prompt_V2M_MLEnhancedGolden_Latest1.6._e7.root";
+               outputFile = "closure/V2/Muon_Run2026D_Prompt_V2M_Golden_e8.root";
             }
             else {
                std::cerr << "Unsupported 2026 runEra: " << runEra << std::endl;
@@ -732,6 +755,107 @@ if (!isClosureTest){
          outputFile = "Winter25_TTtoLNu2Q_V3M_25V3MCSF.root"; //"Winter25_TTtoLNu2Q.root";
       }
    }
+   else if (runYear == 2016){
+      jsonFile = "Cert_271036-284044_13TeV_Legacy2016_Collisions16_JSON.json";
+      jecMCSet = "Summer20UL16NanoV15_V1_MC/Summer20UL16NanoV15_V1_MC_L2Relative_AK4PFPuppi";
+      jecDataSet = "Summer20UL16NanoV15_RunFGH_V1_DATA/Summer20UL16NanoV15_RunFGH_V1_DATA_L2L3Residual_AK4PFPuppi";
+      jetVetoMap = "jet_veto_maps/hotjets-UL16.root";
+      outputFile = "output/Muon_Summer20UL16FGHpostVFP_NanoV15.root";
+   } else if (runYear == 2017){
+      jsonFile = "Cert_294927-306462_13TeV_UL2017_Collisions17_GoldenJSON.json";
+      jecMCSet = "Summer20UL17NanoV15_V1_MC/Summer20UL17NanoV15_V1_MC_L2Relative_AK4PFPuppi";
+      jetVetoMap = "jet_veto_maps/hotjets-UL17_v2.root";
+      if (runEra == "B") {
+         jecDataSet = "Summer20UL17NanoV15_RunB_V1_DATA/Summer20UL17NanoV15_RunB_V1_DATA_L2L3Residual_AK4PFPuppi";
+         outputFile = "output/Muon_Summer20UL17B_NanoV15.root";
+      }
+      if (runEra == "C") {
+         jecDataSet = "Summer20UL17NanoV15_RunC_V1_DATA/Summer20UL17NanoV15_RunC_V1_DATA_L2L3Residual_AK4PFPuppi";
+         outputFile = "output/Muon_Summer20UL17C_NanoV15.root";
+      }
+      if (runEra == "D") {
+         jecDataSet = "Summer20UL17NanoV15_RunD_V1_DATA/Summer20UL17NanoV15_RunD_V1_DATA_L2L3Residual_AK4PFPuppi";
+         outputFile = "output/Muon_Summer20UL17D_NanoV15.root";
+      }
+      if (runEra == "E") {
+         jecDataSet = "Summer20UL17NanoV15_RunE_V1_DATA/Summer20UL17NanoV15_RunE_V1_DATA_L2L3Residual_AK4PFPuppi";
+         outputFile = "output/Muon_Summer20UL17E_NanoV15.root";
+      }
+      if (runEra == "F") {
+         jecDataSet = "Summer20UL17NanoV15_RunF_V1_DATA/Summer20UL17NanoV15_RunF_V1_DATA_L2L3Residual_AK4PFPuppi";
+         outputFile = "output/Muon_Summer20UL17F_NanoV15.root";
+      }
+   } else if (runYear == 2018){
+      jsonFile = "Cert_314472-325175_13TeV_Legacy2018_Collisions18_JSON.json";
+      jecMCSet = "Summer20UL18NanoV15_V1_MC/Summer20UL18NanoV15_V1_MC_L2Relative_AK4PFPuppi";
+      jetVetoMap = "jet_veto_maps/hotjets-UL18.root";
+      if (runEra == "A") {
+         jecDataSet = "Summer20UL18NanoV15_RunA_V1_DATA/Summer20UL18NanoV15_RunA_V1_DATA_L2L3Residual_AK4PFPuppi";
+         outputFile = "output/Muon_Summer20UL18A_NanoV15.root";
+      }
+      if (runEra == "B") {
+         jecDataSet = "Summer20UL18NanoV15_RunB_V1_DATA/Summer20UL18NanoV15_RunB_V1_DATA_L2L3Residual_AK4PFPuppi";
+         outputFile = "output/Muon_Summer20UL18B_NanoV15.root";
+      }
+      if (runEra == "C") {
+         jecDataSet = "Summer20UL18NanoV15_RunC_V1_DATA/Summer20UL18NanoV15_RunC_V1_DATA_L2L3Residual_AK4PFPuppi";
+         outputFile = "output/Muon_Summer20UL18C_NanoV15.root";
+      }
+      if (runEra == "D") {
+         jecDataSet = "Summer20UL18NanoV15_RunD_V1_DATA/Summer20UL18NanoV15_RunD_V1_DATA_L2L3Residual_AK4PFPuppi";
+         outputFile = "output/Muon_Summer20UL18D_NanoV15.root";
+      }
+   } else if (runYear == 2022) {
+      jsonFile = "Cert_Collisions2022_355100_362760_Golden.json";
+      if (runEra == "C" || runEra == "D") {
+         jecMCSet = "Summer22_22Sep2023_V4_MC/Summer22_22Sep2023_V4_MC_L2Relative_AK4PFPuppi";
+         jetVetoMap = "jet_veto_maps/Summer22_23Sep2023_RunCD_v1.root";
+         jecDataSet = "Summer22_22Sep2023_RunCD_V4_DATA/Summer22_22Sep2023_RunCD_V4_DATA_L2L3Residual_AK4PFPuppi";
+         if (runEra == "C")
+               outputFile = "output/Muon_Summer22C_22Sep2023_JMENanoV15.root";
+         if (runEra == "D")
+               outputFile = "output/Muon_Summer22D_22Sep2023_JMENanoV15.root";
+      }
+
+      if (runEra == "E" || runEra == "F" || runEra == "G") {
+         jecMCSet = "Summer22EE_22Sep2023_V4_MC/Summer22EE_22Sep2023_V4_MC_L2Relative_AK4PFPuppi";
+         jetVetoMap = "jet_veto_maps/Summer22EE_23Sep2023_RunEFG_v1.root";
+
+         if (runEra == "E") {
+               jecDataSet = "Summer22EE_22Sep2023_RunE_V4_DATA/Summer22EE_22Sep2023_RunE_V4_DATA_L2L3Residual_AK4PFPuppi";
+               outputFile = "output/Muon_Summer22EEE_22Sep2023_JMENanoV15.root";
+         }
+         if (runEra == "F") {
+               jecDataSet = "Summer22EE_22Sep2023_RunF_V4_DATA/Summer22EE_22Sep2023_RunF_V4_DATA_L2L3Residual_AK4PFPuppi";
+               outputFile = "output/Muon_Summer22EEF_22Sep2023_JMENanoV15.root";
+         }
+         if (runEra == "G") {
+               jecDataSet = "Summer22EE_22Sep2023_RunG_V4_DATA/Summer22EE_22Sep2023_RunG_V4_DATA_L2L3Residual_AK4PFPuppi";
+               outputFile = "output/Muon_Summer22EEG_22Sep2023_JMENanoV15.root";
+         }
+      }
+   } else if (runYear == 2023) {
+      jsonFile = "Cert_Collisions2023_366442_370790_Golden.json";
+      if (runEra == "C123" || runEra == "C4") {
+         jecMCSet = "Summer23Prompt23_V4_MC/Summer23Prompt23_V4_MC_L2Relative_AK4PFPuppi";
+         jetVetoMap = "jet_veto_maps/Summer23Prompt23_RunC_v1.root";
+
+         if (runEra == "C123") {
+               jecDataSet = "Summer23Prompt23_RunCv123_V4_DATA/Summer23Prompt23_RunCv123_V4_DATA_L2L3Residual_AK4PFPuppi";
+         }
+         if (runEra == "C4") {
+               jecDataSet = "Summer23Prompt23_RunCv4_V4_DATA/Summer23Prompt23_RunCv4_V4_DATA_L2L3Residual_AK4PFPuppi";
+         }
+         outputFile = "output/Muon_Summer23" + runEra + "_Prompt23_JMENanoV15.root";
+      }
+
+      if (runEra == "D") {
+         jecMCSet = "Summer23BPixPrompt23_V4_MC/Summer23BPixPrompt23_V4_MC_L2Relative_AK4PFPuppi";
+         jetVetoMap = "jet_veto_maps/Summer23BPixPrompt23_RunD_v1.root";
+         jecDataSet = "Summer23BPixPrompt23_RunD_V4_DATA/Summer23BPixPrompt23_RunD_V4_DATA_L2L3Residual_AK4PFPuppi";
+         outputFile = "output/Muon_Summer23BPixD_Prompt23_JMENanoV15.root";
+      }
+   }
    else if (runYear == 2024) {
        jsonFile   = "Cert_Collisions2024_378981_386951_Golden.json";
        jecMCSet   = "RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI"; //Winter24Run3_V1_MC_L2Relative_AK4PUPPI //RunIII2024Summer24_V2_MC_L2Relative_AK4PUPPI
@@ -750,7 +874,7 @@ if (!isClosureTest){
          else if (runEra == "I") outputFile = "Muon_Run2024I_Prompt_V9M.root";
          else if (runEra == "CDEFGHI") outputFile = "Muon_Run2024CDEFGHI_ReReco_V9M.root";
          else if (runEra.find("nib") != std::string::npos) {
-            outputFile = Find2024NibOutputFileFromFibs(runEra, jecDataSet, 1);
+            outputFile = Find2024NibOutputFileFromFibs(runEra, jecDataSet, correctionVersion, 1);
             if (outputFile.empty()) {
                std::cerr << "Unsupported 2024 nib-era for output-file generation: " << runEra << std::endl;
                return;
@@ -875,6 +999,17 @@ if (!isClosureTest){
 
    double xmax = 450000.5; //389000.5
    double xmin = 355000.5;
+
+   if (runYear == 2016 || runYear == 2017 || runYear == 2018){
+      xmax = 350000.5; //389000.5
+      xmin = 255000;
+   }
+
+   if (runYear == 2022 || runYear == 2023){
+      xmax = 400000.5; //389000.5
+      xmin = 305000;
+   }
+
    double histnx = xmax-xmin;
 
    double vx[] = {15, 20, 25, 30, 35, 40, 50, 60, 75, 90, 110, 130, 175, 230,
@@ -1326,14 +1461,14 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
          // Tell the smearing code to use the pt-dependent SF provider
          useJERSFvsPt = true;
        }
-   } else if ((runYear == 2025) || (runYear == 2026)){
-      jec = getFJC("", jecMCSet, jecDataSet);
-      assert(jec);
-   } else { //2024 with fibs.txt
+   } else if (runYear == 2024){ //2024 with fibs.txt
        jec2024 = new FactorizedJetCorrectorWrapper();
        jec2024->addJECset(jecDataSet);
        assert(jec2024);
-   }
+   } else {
+      jec = getFJC("", jecMCSet, jecDataSet);
+      assert(jec);
+   } 
    //FactorizedJetCorrectorWrapper *jec = new FactorizedJetCorrectorWrapper();
    //jec->addJECset("Prompt24_V8M_DATA");
    //jec->addJECset("Reprocessing24_V8M_DATA");
@@ -1341,33 +1476,39 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
 
 
 
-    TFile *fjv(0);
-    //fjv = new TFile("jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root","READ");
-    fjv = new TFile(jetVetoMap.c_str(),"READ");
-    //jet_veto_maps/Winter24Prompt24/Winter24Prompt24_2024BCDEFGHI.root //jetvetoReReco2024_V9M.root
-    if (!fjv) cout << "Jetvetomap file not found"  << endl << flush;
-    assert(fjv);
+   TFile *fjv(0);
+   //fjv = new TFile("jet_veto_maps/Summer24ReReco/jetvetoReReco2024_V9M.root","READ");
+   fjv = new TFile(jetVetoMap.c_str(),"READ");
+   //jet_veto_maps/Winter24Prompt24/Winter24Prompt24_2024BCDEFGHI.root //jetvetoReReco2024_V9M.root
+   if (!fjv) cout << "Jetvetomap file not found"  << endl << flush;
+   assert(fjv);
 
-    TH2D *h2jv = 0;
-    TH2D *bpixjv = 0;
-    TH2D *fpixjv = 0;
-    h2jv = (TH2D*)fjv->Get("jetvetomap_all");
-    bpixjv = (TH2D*)fjv->Get("jetvetomap_bpix"); //loading the bpix vetomap for all '24 stuff
-    fpixjv = (TH2D*)fjv->Get("jetvetomap_fpix"); //loading the fpix vetomap for all '24 stuff
-    if (!h2jv) cout << "Jetvetomap histo not found" << endl << flush;
-    assert(h2jv);
+   TH2D *h2jv = 0;
+   TH2D *bpixjv = 0;
+   TH2D *fpixjv = 0;
+   if (runYear == 2016) {
+      h2jv   = (TH2D*)fjv->Get("h2hot_ul16_plus_hbm2_hbp12_qie11");
+      bpixjv = (TH2D*)fjv->Get("h2hot_mc");
+   }
+   else if (runYear == 2017) {
+      h2jv = (TH2D*)fjv->Get("h2hot_ul17_plus_hep17_plus_hbpw89");
+   }
+   else if (runYear == 2018) {
+      h2jv = (TH2D*)fjv->Get("h2hot_ul18_plus_hem1516_and_hbp2m1");
+   }
+   else {
+      h2jv   = (TH2D*)fjv->Get("jetvetomap_all");
+      bpixjv = (TH2D*)fjv->Get("jetvetomap_bpix");
+      fpixjv = (TH2D*)fjv->Get("jetvetomap_fpix");
+   }
+
+   if (!h2jv) cout << "Jetvetomap histo not found" << endl << flush;
+   assert(h2jv);
 
    std::vector<int> goodMuonIndices;
-   goodMuonIndices.reserve(nMuon);
-
    std::vector<int> bjetIndices;
-   bjetIndices.reserve(nJet);
-
    std::vector<int> lightJetIndices;
-   lightJetIndices.reserve(nJet);
-
    std::vector<int> gluonJetIndices;
-   gluonJetIndices.reserve(nJet);
 
    // Smear JER
 	JME::JetResolution *jer(0);
@@ -1640,6 +1781,30 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
       Long64_t ientry = LoadTree(jentry);
       if (ientry < 0) break;
       nb = fChain->GetEntry(jentry);   nbytes += nb;
+
+      if (nb <= 0) {
+         std::cout << "[WARNING] GetEntry failed for jentry=" << jentry << std::endl;
+         continue;
+      }
+
+      if (nMuon < 0 || nMuon > 10000 || nJet < 0 || nJet > 10000) {
+         std::cout << "[ERROR] Bad event sizes: "
+                  << "jentry=" << jentry
+                  << ", nMuon=" << nMuon
+                  << ", nJet=" << nJet
+                  << std::endl;
+         continue;
+      }
+
+      goodMuonIndices.clear();
+      bjetIndices.clear();
+      lightJetIndices.clear();
+      gluonJetIndices.clear();
+
+      goodMuonIndices.reserve(nMuon);
+      bjetIndices.reserve(nJet);
+      lightJetIndices.reserve(nJet);
+      gluonJetIndices.reserve(nJet);
       
       if (isMC && !psLayoutInitialized) {
          initPSWeightLayout();
@@ -1903,12 +2068,12 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
          }
 
          // avgPU filter
-         if (runYear != 2026 && runYear != 2024 && runYear != 2025) {
+         /*if (runYear != 2026 && runYear != 2024 && runYear != 2025) {
                if (_avgpu[run][luminosityBlock] == 0) {
                ++_nbadevents_lumi;
                continue;
             }
-         }
+         }*/
          ++_nevents;
       }
          //double w = (isMC ? (genWeight) : 1);//(PSWeight[3]*genWeight) : 1);    //in case of MC set w to genWeight, otherwise (data) leave it 1
@@ -2194,7 +2359,9 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
          if (true) { // jet veto
             int i1 = h2jv->GetXaxis()->FindBin(jet.Eta());
             int j1 = h2jv->GetYaxis()->FindBin(jet.Phi());
-            if (h2jv->GetBinContent(i1,j1)>0 or bpixjv->GetBinContent(i1,j1)>0 or fpixjv->GetBinContent(i1,j1)>0) {
+            if ((h2jv->GetBinContent(i1,j1)>0) or 
+               (bpixjv && bpixjv->GetBinContent(i1,j1)>0) or 
+               (fpixjv && fpixjv->GetBinContent(i1,j1)>0)) {
                ++_nbadevents_veto;
                pass_jetveto = false;
             }

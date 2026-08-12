@@ -1270,6 +1270,7 @@ public :
    Bool_t          HLT_IsoMu24;
    Bool_t          HLT_IsoMu24_eta2p1;
    Bool_t          HLT_IsoMu27;
+   Bool_t          HLT_IsoTkMu24;
    Bool_t          HLT_UncorrectedJetE30_NoBPTX;
    Bool_t          HLT_UncorrectedJetE30_NoBPTX3BX;
    Bool_t          HLT_UncorrectedJetE60_NoBPTX3BX;
@@ -3121,6 +3122,7 @@ public :
    TBranch        *b_HLT_Ele32_WPTight_Gsf_L1DoubleEG;   //!
    TBranch        *b_HLT_IsoMu20;   //!
    TBranch        *b_HLT_IsoMu24;   //!
+   TBranch        *b_HLT_IsoTkMu24;   //!
    TBranch        *b_HLT_IsoMu24_eta2p1;   //!
    TBranch        *b_HLT_IsoMu27;   //!
    TBranch        *b_HLT_UncorrectedJetE30_NoBPTX;   //!
@@ -5111,6 +5113,7 @@ void WMassRun3::Init(TTree *tree)
    fChain->SetBranchAddress("HLT_Ele32_WPTight_Gsf_L1DoubleEG", &HLT_Ele32_WPTight_Gsf_L1DoubleEG, &b_HLT_Ele32_WPTight_Gsf_L1DoubleEG);
    fChain->SetBranchAddress("HLT_IsoMu20", &HLT_IsoMu20, &b_HLT_IsoMu20);
    fChain->SetBranchAddress("HLT_IsoMu24", &HLT_IsoMu24, &b_HLT_IsoMu24);
+   fChain->SetBranchAddress("HLT_IsoTkMu24", &HLT_IsoTkMu24, &b_HLT_IsoTkMu24);
    fChain->SetBranchAddress("HLT_IsoMu24_eta2p1", &HLT_IsoMu24_eta2p1, &b_HLT_IsoMu24_eta2p1);
    fChain->SetBranchAddress("HLT_IsoMu27", &HLT_IsoMu27, &b_HLT_IsoMu27);
    fChain->SetBranchAddress("HLT_UncorrectedJetE30_NoBPTX", &HLT_UncorrectedJetE30_NoBPTX, &b_HLT_UncorrectedJetE30_NoBPTX);

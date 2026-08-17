@@ -760,30 +760,30 @@ if (!isClosureTest){
       jecMCSet = "Summer20UL16NanoV15_V1_MC/Summer20UL16NanoV15_V1_MC_L2Relative_AK4PFPuppi";
       jecDataSet = "Summer20UL16NanoV15_RunFGH_V1_DATA/Summer20UL16NanoV15_RunFGH_V1_DATA_L2L3Residual_AK4PFPuppi";
       jetVetoMap = "jet_veto_maps/hotjets-UL16.root";
-      outputFile = "output/Muon_Summer20UL16FGHpostVFP_NanoV15.root";
+      outputFile = "output/Muon_Summer20UL16FGHpostVFP_NanoV15_e1.root";
    } else if (runYear == 2017){
       jsonFile = "Cert_294927-306462_13TeV_UL2017_Collisions17_GoldenJSON.json";
       jecMCSet = "Summer20UL17NanoV15_V1_MC/Summer20UL17NanoV15_V1_MC_L2Relative_AK4PFPuppi";
       jetVetoMap = "jet_veto_maps/hotjets-UL17_v2.root";
       if (runEra == "B") {
          jecDataSet = "Summer20UL17NanoV15_RunB_V1_DATA/Summer20UL17NanoV15_RunB_V1_DATA_L2L3Residual_AK4PFPuppi";
-         outputFile = "output/Muon_Summer20UL17B_NanoV15.root";
+         outputFile = "output/Muon_Summer20UL17B_NanoV15_e1.root";
       }
       if (runEra == "C") {
          jecDataSet = "Summer20UL17NanoV15_RunC_V1_DATA/Summer20UL17NanoV15_RunC_V1_DATA_L2L3Residual_AK4PFPuppi";
-         outputFile = "output/Muon_Summer20UL17C_NanoV15.root";
+         outputFile = "output/Muon_Summer20UL17C_NanoV15_e1.root";
       }
       if (runEra == "D") {
          jecDataSet = "Summer20UL17NanoV15_RunD_V1_DATA/Summer20UL17NanoV15_RunD_V1_DATA_L2L3Residual_AK4PFPuppi";
-         outputFile = "output/Muon_Summer20UL17D_NanoV15.root";
+         outputFile = "output/Muon_Summer20UL17D_NanoV15_e1.root";
       }
       if (runEra == "E") {
          jecDataSet = "Summer20UL17NanoV15_RunE_V1_DATA/Summer20UL17NanoV15_RunE_V1_DATA_L2L3Residual_AK4PFPuppi";
-         outputFile = "output/Muon_Summer20UL17E_NanoV15.root";
+         outputFile = "output/Muon_Summer20UL17E_NanoV15_e1.root";
       }
       if (runEra == "F") {
          jecDataSet = "Summer20UL17NanoV15_RunF_V1_DATA/Summer20UL17NanoV15_RunF_V1_DATA_L2L3Residual_AK4PFPuppi";
-         outputFile = "output/Muon_Summer20UL17F_NanoV15.root";
+         outputFile = "output/Muon_Summer20UL17F_NanoV15_e1.root";
       }
    } else if (runYear == 2018){
       jsonFile = "Cert_314472-325175_13TeV_Legacy2018_Collisions18_JSON.json";
@@ -791,19 +791,19 @@ if (!isClosureTest){
       jetVetoMap = "jet_veto_maps/hotjets-UL18.root";
       if (runEra == "A") {
          jecDataSet = "Summer20UL18NanoV15_RunA_V1_DATA/Summer20UL18NanoV15_RunA_V1_DATA_L2L3Residual_AK4PFPuppi";
-         outputFile = "output/Muon_Summer20UL18A_NanoV15.root";
+         outputFile = "output/Muon_Summer20UL18A_NanoV15_e1.root";
       }
       if (runEra == "B") {
          jecDataSet = "Summer20UL18NanoV15_RunB_V1_DATA/Summer20UL18NanoV15_RunB_V1_DATA_L2L3Residual_AK4PFPuppi";
-         outputFile = "output/Muon_Summer20UL18B_NanoV15.root";
+         outputFile = "output/Muon_Summer20UL18B_NanoV15_e1.root";
       }
       if (runEra == "C") {
          jecDataSet = "Summer20UL18NanoV15_RunC_V1_DATA/Summer20UL18NanoV15_RunC_V1_DATA_L2L3Residual_AK4PFPuppi";
-         outputFile = "output/Muon_Summer20UL18C_NanoV15.root";
+         outputFile = "output/Muon_Summer20UL18C_NanoV15_e1.root";
       }
       if (runEra == "D") {
          jecDataSet = "Summer20UL18NanoV15_RunD_V1_DATA/Summer20UL18NanoV15_RunD_V1_DATA_L2L3Residual_AK4PFPuppi";
-         outputFile = "output/Muon_Summer20UL18D_NanoV15.root";
+         outputFile = "output/Muon_Summer20UL18D_NanoV15_e1.root";
       }
    } else if (runYear == 2022) {
       jsonFile = "Cert_Collisions2022_355100_362760_Golden.json";
@@ -812,9 +812,9 @@ if (!isClosureTest){
          jetVetoMap = "jet_veto_maps/Summer22_23Sep2023_RunCD_v1.root";
          jecDataSet = "Summer22_22Sep2023_RunCD_V4_DATA/Summer22_22Sep2023_RunCD_V4_DATA_L2L3Residual_AK4PFPuppi";
          if (runEra == "C")
-               outputFile = "output/Muon_Summer22C_22Sep2023_JMENanoV15.root";
+               outputFile = "output/Muon_Summer22C_22Sep2023_JMENanoV15_e1.root";
          if (runEra == "D")
-               outputFile = "output/Muon_Summer22D_22Sep2023_JMENanoV15.root";
+               outputFile = "output/Muon_Summer22D_22Sep2023_JMENanoV15_e1.root";
       }
 
       if (runEra == "E" || runEra == "F" || runEra == "G") {
@@ -823,15 +823,15 @@ if (!isClosureTest){
 
          if (runEra == "E") {
                jecDataSet = "Summer22EE_22Sep2023_RunE_V4_DATA/Summer22EE_22Sep2023_RunE_V4_DATA_L2L3Residual_AK4PFPuppi";
-               outputFile = "output/Muon_Summer22EEE_22Sep2023_JMENanoV15.root";
+               outputFile = "output/Muon_Summer22EEE_22Sep2023_JMENanoV15_e1.root";
          }
          if (runEra == "F") {
                jecDataSet = "Summer22EE_22Sep2023_RunF_V4_DATA/Summer22EE_22Sep2023_RunF_V4_DATA_L2L3Residual_AK4PFPuppi";
-               outputFile = "output/Muon_Summer22EEF_22Sep2023_JMENanoV15.root";
+               outputFile = "output/Muon_Summer22EEF_22Sep2023_JMENanoV15_e1.root";
          }
          if (runEra == "G") {
                jecDataSet = "Summer22EE_22Sep2023_RunG_V4_DATA/Summer22EE_22Sep2023_RunG_V4_DATA_L2L3Residual_AK4PFPuppi";
-               outputFile = "output/Muon_Summer22EEG_22Sep2023_JMENanoV15.root";
+               outputFile = "output/Muon_Summer22EEG_22Sep2023_JMENanoV15_e1.root";
          }
       }
    } else if (runYear == 2023) {
@@ -846,14 +846,14 @@ if (!isClosureTest){
          if (runEra == "C4") {
                jecDataSet = "Summer23Prompt23_RunCv4_V4_DATA/Summer23Prompt23_RunCv4_V4_DATA_L2L3Residual_AK4PFPuppi";
          }
-         outputFile = "output/Muon_Summer23" + runEra + "_Prompt23_JMENanoV15.root";
+         outputFile = "output/Muon_Summer23" + runEra + "_Prompt23_JMENanoV15_e1.root";
       }
 
       if (runEra == "D") {
          jecMCSet = "Summer23BPixPrompt23_V4_MC/Summer23BPixPrompt23_V4_MC_L2Relative_AK4PFPuppi";
          jetVetoMap = "jet_veto_maps/Summer23BPixPrompt23_RunD_v1.root";
          jecDataSet = "Summer23BPixPrompt23_RunD_V4_DATA/Summer23BPixPrompt23_RunD_V4_DATA_L2L3Residual_AK4PFPuppi";
-         outputFile = "output/Muon_Summer23BPixD_Prompt23_JMENanoV15.root";
+         outputFile = "output/Muon_Summer23BPixD_Prompt23_JMENanoV15_e1.root";
       }
    }
    else if (runYear == 2024) {

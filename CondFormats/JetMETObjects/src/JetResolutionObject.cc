@@ -57,7 +57,7 @@ namespace JME {
         m_values = std::move(rhs.m_values);
     }
 
-    JetParameters::JetParameters(std::initializer_list<typename value_type::value_type> init) {
+    JetParameters::JetParameters(std::initializer_list<typename JetParameters::value_type::value_type> init) {
         for (auto& i: init) {
             set(i.first, i.second);
         }

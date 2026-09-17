@@ -84,7 +84,7 @@ void AddFilesRecursively(const TString &dirPath, TChain *chain) {
          // Always recurse into directories
          AddFilesRecursively(fullPath, chain);
       } else if (fname.EndsWith(".root") &&
-        (fullPath.Contains("2023D/"))){ //|| fullPath.Contains("date-10Feb2026"))){//fullPath.Contains("date-23Jan2026_time-104810_commit-4d9fd29")) { 
+        (fullPath.Contains("2016E_HIPM/"))){ //|| fullPath.Contains("date-10Feb2026"))){//fullPath.Contains("date-23Jan2026_time-104810_commit-4d9fd29")) { 
          //MC: date-14May2025_time-124123_commit-23dc684
          //CDE DataReprocessing: date-08May2025_time-160559_commit-23dc684
          //FGHI Prompt24: date-20May2025_time-131924_commit-23dc684
@@ -127,7 +127,8 @@ void mk_WMassRun3() {
    //TString mainDirectory = "/eos/user/e/eveikkol/Skim/Wqqm/2025/Data/";
    //TString mainDirectory = "/eos/user/e/eveikkol/Skim/Wqqm/2026/Data/2026A";
    //TString mainDirectory = "/eos/user/e/eveikkol/Skim/Wqqm/2026/Data/";
-   TString mainDirectory = "/eos/user/e/eveikkol/Skim/Wqqm/2023/Data/";
+   //TString mainDirectory = "/eos/user/e/eveikkol/Skim/Wqqm/2023/Data/";
+   TString mainDirectory = "/eos/user/e/eveikkol/Skim/Wqqm/2016/Data/";
 
    // Recursively add all ROOT files found under the main directory.
    AddFilesRecursively(mainDirectory, c);

@@ -550,8 +550,8 @@ void WMassRun3::Loop()
    //fout = new TFile("Summer24_TTtoLNu2Q.root", "RECREATE");
    // Year-based configuration
    bool isClosureTest = false;
-   static const int runYear = 2023; // set to 2024 or 2025
-   static const std::string runEra = "D"; // for 2025: "A", "B", etc.
+   static const int runYear = 2016; // set to 2024 or 2025
+   static const std::string runEra = "E_HIPM"; // for 2025: "A", "B", etc.
    bool isNIBS = false;
    std::string jsonFile, jecMCSet, jecDataSet, outputFile, jetVetoMap, JERSFvsPt, JERres, correctionVersion;
    std::string mcNormTag; // input_files/mc_norm_TTtoLNu2Q_<tag>.txt
@@ -755,12 +755,35 @@ if (!isClosureTest){
          outputFile = "Winter25_TTtoLNu2Q_V3M_25V3MCSF.root"; //"Winter25_TTtoLNu2Q.root";
       }
    }
-   else if (runYear == 2016){
+   else if (runYear == 2016) {
       jsonFile = "Cert_271036-284044_13TeV_Legacy2016_Collisions16_JSON.json";
-      jecMCSet = "Summer20UL16NanoV15_V1_MC/Summer20UL16NanoV15_V1_MC_L2Relative_AK4PFPuppi";
-      jecDataSet = "Summer20UL16NanoV15_RunFGH_V1_DATA/Summer20UL16NanoV15_RunFGH_V1_DATA_L2L3Residual_AK4PFPuppi";
       jetVetoMap = "jet_veto_maps/hotjets-UL16.root";
-      outputFile = "output/Muon_Summer20UL16FGHpostVFP_NanoV15_e1.root";
+
+      if (runEra == "B_HIPM" || runEra == "C_HIPM" ||
+          runEra == "D_HIPM" || runEra == "E_HIPM" ||
+          runEra == "F_HIPM") {
+
+         jecMCSet = "Summer20UL16APVNanoV15_V1_MC/Summer20UL16APVNanoV15_V1_MC_L2Relative_AK4PFPuppi";
+
+         if (runEra == "B_HIPM" || runEra == "C_HIPM" ||
+             runEra == "D_HIPM") {
+            jecDataSet = "Summer20UL16APVNanoV15_RunBCD_V1_DATA/Summer20UL16APVNanoV15_RunBCD_V1_DATA_L2L3Residual_AK4PFPuppi";
+         } else {
+            jecDataSet = "Summer20UL16APVNanoV15_RunEF_V1_DATA/Summer20UL16APVNanoV15_RunEF_V1_DATA_L2L3Residual_AK4PFPuppi";
+         }
+
+         outputFile = "output/Muon_Summer20UL16_" + runEra + "_preVFP_NanoV15_e2.root";
+      }
+      else if (runEra == "F" || runEra == "G" || runEra == "H") {
+         jecMCSet = "Summer20UL16NanoV15_V1_MC/Summer20UL16NanoV15_V1_MC_L2Relative_AK4PFPuppi";
+         jecDataSet = "Summer20UL16NanoV15_RunFGH_V1_DATA/Summer20UL16NanoV15_RunFGH_V1_DATA_L2L3Residual_AK4PFPuppi";
+
+         outputFile = "output/Muon_Summer20UL16_" + runEra + "_postVFP_NanoV15_e1.root";
+      }
+      else {
+         std::cerr << "Unsupported 2016 runEra: " << runEra << std::endl;
+         return;
+      }
    } else if (runYear == 2017){
       jsonFile = "Cert_294927-306462_13TeV_UL2017_Collisions17_GoldenJSON.json";
       jecMCSet = "Summer20UL17NanoV15_V1_MC/Summer20UL17NanoV15_V1_MC_L2Relative_AK4PFPuppi";
@@ -1504,6 +1527,7 @@ TProfile* p_genJetPtOverPartonPt_vs_partonPt_dgt2R =
 
    if (!h2jv) cout << "Jetvetomap histo not found" << endl << flush;
    assert(h2jv);
+   if (runYear == 2016) assert(bpixjv);
 
    std::vector<int> goodMuonIndices;
    std::vector<int> bjetIndices;

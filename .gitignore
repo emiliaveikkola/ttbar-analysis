@@ -16,3 +16,6 @@ log_*
 *.bak
 *ACLiC*
 test*
+CMSSW*/
+CondFormats/JetMETObjects/data
+inputs/
